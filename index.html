@@ -1,0 +1,2625 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="artifact-type" content="narrative">
+  <meta name="design-style" content="nocturne">
+  <title>AI Agents 是什麼？從核心架構到自主任務執行</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@1.43.0/dist/umd/lucide.min.js"></script>
+  <style>
+    :root {
+      color-scheme: dark;
+
+      /* Deep Blue / Indigo-Violet Tech Palette adapted from Nocturne */
+      --background: #070b18;
+      --surface-container-low: #0c1226;
+      --surface-container: #111936;
+      --surface-container-high: #19244a;
+
+      /* Text */
+      --on-surface: #eef2ff;
+      --on-surface-variant: #9ba8d0;
+
+      /* Borders */
+      --outline: #3c4f82;
+      --outline-variant: #223059;
+
+      /* Accents */
+      --primary: #818cf8;
+      --on-primary: #070b18;
+      --primary-container: #24295c;
+      --on-primary-container: #e0e7ff;
+      --secondary: #687ba8;
+      --tertiary: #38bdf8;
+      --violet-accent: #c084fc;
+      --error: #f87171;
+      --on-error: #1f0707;
+      --positive: #34d399;
+      --warning: #fbbf24;
+      --focus: #818cf8;
+
+      /* Data series */
+      --data-1: #818cf8;
+      --data-2: #38bdf8;
+      --data-3: #34d399;
+      --data-4: #c084fc;
+      --data-context: #475985;
+
+      /* Fonts */
+      --font-headline: 'Noto Sans TC', 'Plus Jakarta Sans', sans-serif;
+      --font-body: 'Noto Sans TC', 'Plus Jakarta Sans', sans-serif;
+      --font-label: 'JetBrains Mono', 'Noto Sans TC', monospace;
+
+      /* Type scale */
+      --display-size: clamp(1.65rem, 1.15rem + 1.8vw, 2.55rem);
+      --headline-size: clamp(1.25rem, 1rem + 0.95vw, 1.65rem);
+      --subhead-size: clamp(0.95rem, 0.88rem + 0.3vw, 1.125rem);
+      --body-size: clamp(0.875rem, 0.84rem + 0.16vw, 0.96rem);
+      --label-size: 0.75rem;
+
+      /* Spacing scale */
+      --space-xs: 0.25rem;
+      --space-sm: 0.5rem;
+      --space-md: 1rem;
+      --space-lg: 1.5rem;
+      --space-xl: 2rem;
+      --space-2xl: 3rem;
+
+      /* Shape */
+      --rounded: 0.375rem;
+      --rounded-lg: 0.625rem;
+      --rounded-full: 9999px;
+
+      /* Effects */
+      --hairline: 1px solid var(--outline-variant);
+      --hairline-strong: 1px solid var(--outline);
+      --panel-highlight: inset 0 1px 0 rgba(238, 242, 255, 0.06);
+      --indigo-glow: radial-gradient(circle at 86% 14%, rgba(129, 140, 248, 0.14), transparent 48%);
+      --cyan-glow: radial-gradient(circle at 14% 88%, rgba(56, 189, 248, 0.09), transparent 45%);
+      --primary-tint: color-mix(in srgb, var(--primary) 14%, transparent);
+      --sky-tint: color-mix(in srgb, var(--tertiary) 13%, transparent);
+      --violet-tint: color-mix(in srgb, var(--violet-accent) 13%, transparent);
+      --positive-tint: color-mix(in srgb, var(--positive) 14%, transparent);
+      --warning-tint: color-mix(in srgb, var(--warning) 14%, transparent);
+      --error-tint: color-mix(in srgb, var(--error) 14%, transparent);
+
+      /* Motion */
+      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+      --dur-micro: 120ms;
+      --dur-short: 220ms;
+      --dur-long: 380ms;
+    }
+
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+
+    html, body {
+      overflow-x: clip;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background);
+      color: var(--on-surface);
+      font-family: var(--font-body);
+      font-size: var(--body-size);
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    button, input, select, textarea {
+      font-family: inherit;
+    }
+
+    :focus-visible {
+      outline: 2px solid var(--focus);
+      outline-offset: 2px;
+    }
+
+    /* Outer Presentation Shell */
+    .deck-shell {
+      min-height: 100dvh;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      background-color: var(--background);
+      background-image: var(--indigo-glow), var(--cyan-glow);
+      padding: var(--space-sm) var(--space-lg);
+      gap: var(--space-sm);
+    }
+
+    /* Top Chrome Bar */
+    .deck-topbar {
+      width: min(94vw, calc((100dvh - 118px) * 16 / 9));
+      max-width: 1280px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: var(--space-md);
+    }
+
+    .topbar-left {
+      display: flex;
+      align-items: center;
+      gap: var(--space-md);
+      min-width: 0;
+    }
+
+    .brand-label {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--tertiary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .progress-track {
+      flex: 1;
+      height: 5px;
+      background: var(--surface-container-high);
+      border-radius: var(--rounded-full);
+      overflow: hidden;
+      border: var(--hairline);
+      min-width: 80px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 8.33%;
+      background: linear-gradient(90deg, var(--primary), var(--tertiary));
+      border-radius: var(--rounded-full);
+      transition: width var(--dur-long) var(--ease-out);
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      position: relative;
+    }
+
+    .page-counter {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      font-variant-numeric: tabular-nums;
+      color: var(--on-surface);
+      background: var(--surface-container);
+      border: var(--hairline);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--rounded);
+    }
+
+    .toc-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--surface-container);
+      color: var(--on-surface-variant);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      font-size: var(--label-size);
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    .toc-btn:hover {
+      background: var(--surface-container-high);
+      color: var(--on-surface);
+    }
+
+    .toc-popover {
+      position: absolute;
+      top: calc(100% + var(--space-xs));
+      right: 0;
+      width: min(340px, 88vw);
+      max-height: 70vh;
+      overflow-y: auto;
+      background: var(--surface-container);
+      border: var(--hairline-strong);
+      box-shadow: var(--panel-highlight);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-sm);
+      z-index: 50;
+      display: none;
+    }
+
+    .toc-popover.open {
+      display: grid;
+      gap: var(--space-xs);
+    }
+
+    .toc-item {
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      align-items: center;
+      gap: var(--space-sm);
+      width: 100%;
+      text-align: left;
+      padding: var(--space-sm);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--rounded);
+      color: var(--on-surface-variant);
+      font-size: 0.8125rem;
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    .toc-item:hover {
+      background: var(--surface-container-high);
+      color: var(--on-surface);
+    }
+
+    .toc-item.active {
+      background: var(--primary-tint);
+      border-color: color-mix(in srgb, var(--primary) 45%, transparent);
+      color: var(--on-surface);
+    }
+
+    .toc-num {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--primary);
+      font-weight: 600;
+    }
+
+    /* 16:9 Stage */
+    .stage-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 0;
+    }
+
+    .slide-stage {
+      width: min(94vw, calc((100dvh - 118px) * 16 / 9));
+      max-width: 1280px;
+      aspect-ratio: 16 / 9;
+      background: var(--surface-container-low);
+      border: var(--hairline-strong);
+      box-shadow: var(--panel-highlight);
+      border-radius: var(--rounded-lg);
+      position: relative;
+      overflow: hidden;
+      background-image: var(--indigo-glow);
+    }
+
+    .slide {
+      position: absolute;
+      inset: 0;
+      padding: var(--space-lg) var(--space-xl);
+      display: none;
+      grid-template-rows: auto minmax(0, 1fr) auto;
+      gap: var(--space-md);
+      overflow-y: auto;
+    }
+
+    .slide.active {
+      display: grid;
+      animation: slideFade var(--dur-short) var(--ease-out);
+    }
+
+    @keyframes slideFade {
+      from {
+        opacity: 0;
+        transform: translateY(6px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Slide Header */
+    .slide-header {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xs);
+      border-bottom: var(--hairline);
+      padding-bottom: var(--space-sm);
+    }
+
+    .slide-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-sm);
+      flex-wrap: wrap;
+    }
+
+    .slide-tag {
+      font-family: var(--font-label);
+      font-size: var(--label-size);
+      color: var(--primary);
+      background: var(--primary-tint);
+      border: 1px solid color-mix(in srgb, var(--primary) 35%, transparent);
+      padding: 2px var(--space-sm);
+      border-radius: var(--rounded);
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .slide-tag.is-cyan {
+      color: var(--tertiary);
+      background: var(--sky-tint);
+      border-color: color-mix(in srgb, var(--tertiary) 35%, transparent);
+    }
+
+    .slide-tag.is-violet {
+      color: var(--violet-accent);
+      background: var(--violet-tint);
+      border-color: color-mix(in srgb, var(--violet-accent) 35%, transparent);
+    }
+
+    .slide-title {
+      margin: 0;
+      font-family: var(--font-headline);
+      font-size: var(--headline-size);
+      font-weight: 700;
+      line-height: 1.22;
+      color: var(--on-surface);
+    }
+
+    .slide-title.is-display {
+      font-size: var(--display-size);
+      line-height: 1.15;
+    }
+
+    .slide-subtitle {
+      margin: 0;
+      font-size: var(--subhead-size);
+      color: var(--on-surface-variant);
+      max-width: 72ch;
+    }
+
+    /* Slide Body & Footer */
+    .slide-body {
+      min-height: 0;
+      display: grid;
+      gap: var(--space-md);
+      align-content: stretch;
+    }
+
+    .slide-footer {
+      border-top: var(--hairline);
+      padding-top: var(--space-xs);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      color: var(--on-surface-variant);
+    }
+
+    .citation-line {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    /* Panel & Card Components */
+    .panel {
+      background: var(--surface-container);
+      border: var(--hairline);
+      box-shadow: var(--panel-highlight);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md);
+      min-width: 0;
+    }
+
+    .panel-well {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-md);
+      min-width: 0;
+    }
+
+    .panel-title {
+      margin: 0 0 var(--space-xs) 0;
+      font-size: 0.98rem;
+      font-weight: 600;
+      color: var(--on-surface);
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+    }
+
+    .muted-text {
+      color: var(--on-surface-variant);
+      font-size: 0.85rem;
+      margin: 0;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      padding: 2px var(--space-sm);
+      border-radius: var(--rounded);
+      background: var(--sky-tint);
+      color: var(--tertiary);
+      border: 1px solid color-mix(in srgb, var(--tertiary) 35%, transparent);
+    }
+
+    .badge.is-indigo {
+      background: var(--primary-tint);
+      color: var(--primary);
+      border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+    }
+
+    .badge.is-positive {
+      background: var(--positive-tint);
+      color: var(--positive);
+      border-color: color-mix(in srgb, var(--positive) 35%, transparent);
+    }
+
+    .badge.is-warning {
+      background: var(--warning-tint);
+      color: var(--warning);
+      border-color: color-mix(in srgb, var(--warning) 35%, transparent);
+    }
+
+    .badge.is-error {
+      background: var(--error-tint);
+      color: var(--error);
+      border-color: color-mix(in srgb, var(--error) 35%, transparent);
+    }
+
+    .badge.is-violet {
+      background: var(--violet-tint);
+      color: var(--violet-accent);
+      border-color: color-mix(in srgb, var(--violet-accent) 35%, transparent);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-xs);
+      min-height: 44px;
+      padding: var(--space-xs) var(--space-md);
+      border-radius: var(--rounded);
+      border: var(--hairline-strong);
+      background: var(--surface-container);
+      color: var(--on-surface);
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+    }
+
+    .btn:hover:not(:disabled) {
+      background: var(--surface-container-high);
+      border-color: var(--primary);
+    }
+
+    .btn:active:not(:disabled) {
+      transform: translateY(1px);
+    }
+
+    .btn:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--on-primary);
+      border-color: var(--primary);
+      font-weight: 600;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      background: color-mix(in srgb, var(--primary) 88%, var(--on-surface));
+      border-color: var(--primary);
+    }
+
+    .btn-sm {
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-sm);
+      font-size: 0.8125rem;
+    }
+
+    /* Grids inside Slides */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: var(--space-md);
+    }
+
+    .grid-2-eq {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-md);
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-md);
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: var(--space-sm);
+    }
+
+    /* Interactive Tabs / Pills inside slides */
+    .tab-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--space-sm);
+    }
+
+    .tab-pill {
+      min-height: 36px;
+      padding: var(--space-xs) var(--space-md);
+      border-radius: var(--rounded);
+      border: var(--hairline);
+      background: var(--background);
+      color: var(--on-surface-variant);
+      font-size: 0.8125rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    .tab-pill:hover {
+      color: var(--on-surface);
+      border-color: var(--outline);
+    }
+
+    .tab-pill.active {
+      background: var(--primary-tint);
+      color: var(--on-surface);
+      border-color: var(--primary);
+    }
+
+    /* Interactive Quad Pillar Cards (Slide 3) */
+    .pillar-btn {
+      text-align: left;
+      width: 100%;
+      background: var(--surface-container);
+      border: var(--hairline);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      color: var(--on-surface);
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out);
+    }
+
+    .pillar-btn:hover {
+      background: var(--surface-container-high);
+      border-color: var(--outline);
+    }
+
+    .pillar-btn.active {
+      background: var(--primary-container);
+      border-color: var(--primary);
+    }
+
+    /* Sliders for Slide 6 Memory Retrieval */
+    .slider-group {
+      display: grid;
+      gap: var(--space-xs);
+    }
+
+    .slider-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8125rem;
+    }
+
+    input[type="range"] {
+      width: 100%;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+
+    .memory-item {
+      background: var(--background);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm) var(--space-md);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: var(--space-sm);
+      align-items: center;
+    }
+
+    .memory-item.top-hit {
+      border-color: var(--tertiary);
+      background: color-mix(in srgb, var(--tertiary) 8%, var(--background));
+    }
+
+    .score-pill {
+      font-family: var(--font-label);
+      font-size: 0.85rem;
+      font-weight: 600;
+      font-variant-numeric: tabular-nums;
+      color: var(--tertiary);
+      background: var(--sky-tint);
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--rounded);
+      border: 1px solid color-mix(in srgb, var(--tertiary) 35%, transparent);
+    }
+
+    /* Quiz Styling (Slide 11) */
+    .quiz-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: var(--space-md);
+      align-items: start;
+    }
+
+    .quiz-card {
+      background: var(--surface-container);
+      border: var(--hairline);
+      border-radius: var(--rounded-lg);
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-sm);
+      height: 100%;
+    }
+
+    .quiz-q {
+      font-size: 0.875rem;
+      font-weight: 600;
+      color: var(--on-surface);
+      margin: 0;
+      line-height: 1.45;
+    }
+
+    .quiz-options {
+      display: grid;
+      gap: var(--space-xs);
+    }
+
+    .quiz-opt {
+      width: 100%;
+      text-align: left;
+      min-height: 40px;
+      padding: var(--space-xs) var(--space-sm);
+      border-radius: var(--rounded);
+      border: var(--hairline);
+      background: var(--background);
+      color: var(--on-surface-variant);
+      font-size: 0.8rem;
+      line-height: 1.4;
+      cursor: pointer;
+      display: flex;
+      align-items: flex-start;
+      gap: var(--space-xs);
+      transition: background-color var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), color var(--dur-micro) var(--ease-out);
+    }
+
+    .quiz-opt:hover:not(:disabled) {
+      background: var(--surface-container-high);
+      color: var(--on-surface);
+      border-color: var(--outline);
+    }
+
+    .quiz-opt:disabled {
+      cursor: default;
+    }
+
+    .quiz-opt.is-correct {
+      background: var(--positive-tint);
+      border-color: var(--positive);
+      color: var(--on-surface);
+    }
+
+    .quiz-opt.is-wrong {
+      background: var(--error-tint);
+      border-color: var(--error);
+      color: var(--on-surface);
+    }
+
+    .quiz-opt.is-dimmed {
+      opacity: 0.55;
+    }
+
+    .quiz-feedback {
+      margin-top: auto;
+      padding: var(--space-sm);
+      border-radius: var(--rounded);
+      font-size: 0.78rem;
+      line-height: 1.45;
+      display: none;
+    }
+
+    .quiz-feedback.show {
+      display: block;
+    }
+
+    .quiz-feedback.correct {
+      background: var(--positive-tint);
+      border: 1px solid color-mix(in srgb, var(--positive) 45%, transparent);
+      color: var(--on-surface);
+    }
+
+    .quiz-feedback.wrong {
+      background: var(--error-tint);
+      border: 1px solid color-mix(in srgb, var(--error) 45%, transparent);
+      color: var(--on-surface);
+    }
+
+    /* Reference Cards (Slide 12) */
+    .ref-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: var(--space-sm);
+    }
+
+    .ref-card {
+      background: var(--surface-container);
+      border: var(--hairline);
+      border-radius: var(--rounded);
+      padding: var(--space-sm) var(--space-md);
+      display: grid;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: var(--space-sm);
+      align-items: start;
+    }
+
+    .ref-num {
+      font-family: var(--font-label);
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--primary);
+      background: var(--primary-tint);
+      border-radius: var(--rounded);
+      padding: 2px 6px;
+      text-align: center;
+    }
+
+    /* Bottom Navigation Bar */
+    .deck-bottombar {
+      width: min(94vw, calc((100dvh - 118px) * 16 / 9));
+      max-width: 1280px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-md);
+    }
+
+    .nav-dots {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .nav-dot {
+      width: 10px;
+      height: 10px;
+      padding: 0;
+      border-radius: var(--rounded-full);
+      border: 1px solid var(--outline);
+      background: var(--surface-container);
+      cursor: pointer;
+      transition: width var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+    }
+
+    .nav-dot:hover {
+      border-color: var(--tertiary);
+    }
+
+    .nav-dot.active {
+      width: 26px;
+      background: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .kbd-hint {
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      color: var(--on-surface-variant);
+    }
+
+    /* Table styling */
+    .tech-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .tech-table th, .tech-table td {
+      text-align: left;
+      padding: 6px 8px;
+      border-bottom: var(--hairline);
+    }
+
+    .tech-table th {
+      font-family: var(--font-label);
+      font-size: 0.72rem;
+      color: var(--on-surface-variant);
+      font-weight: 500;
+    }
+
+    .num-cell {
+      font-family: var(--font-label);
+      font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+
+    /* Responsive Mobile & Narrow Breakpoints */
+    @media (max-width: 900px) {
+      .deck-topbar, .deck-bottombar {
+        width: 100%;
+      }
+      .slide-stage {
+        width: 100%;
+        aspect-ratio: auto;
+        min-height: 560px;
+      }
+      .slide {
+        position: relative;
+        padding: var(--space-md);
+      }
+      .grid-2, .grid-2-eq, .grid-3, .grid-4, .quiz-grid, .ref-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 640px) {
+      .deck-shell {
+        padding: var(--space-sm);
+      }
+      .kbd-hint {
+        display: none;
+      }
+      .nav-dots {
+        display: none;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="deck-shell">
+    <!-- Top Progress & Slide Indicator -->
+    <div class="deck-topbar">
+      <div class="topbar-left">
+        <span class="brand-label">AI AGENTS // 教學簡報</span>
+        <div class="progress-track" aria-label="簡報進度條">
+          <div class="progress-fill" id="progress-fill"></div>
+        </div>
+      </div>
+      <div class="topbar-right">
+        <span class="page-counter" id="page-counter" aria-live="polite">1 / 12</span>
+        <button type="button" class="toc-btn" id="toc-toggle" onclick="toggleToc()" aria-expanded="false" aria-controls="toc-popover">
+          <i data-lucide="list" style="width:15px;height:15px;" aria-hidden="true"></i>
+          <span>章節目錄</span>
+        </button>
+        <div class="toc-popover" id="toc-popover" role="menu" aria-label="簡報頁面目錄"></div>
+      </div>
+    </div>
+
+    <!-- 16:9 Presentation Stage -->
+    <main class="stage-wrapper">
+      <div class="slide-stage" id="slide-stage">
+
+        <!-- SLIDE 1: Cover -->
+        <section class="slide active" data-slide="1" aria-label="第 1 頁：封面">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag">01 // 核心主題導論</span>
+              <span class="badge">16:9 互動式教學簡報</span>
+            </div>
+            <h1 class="slide-title is-display">AI Agents 是什麼？從核心架構到自主任務執行</h1>
+            <p class="slide-subtitle">從「靜態文字生成」躍遷為「具備角色、記憶、規劃與行動閉環的自主智慧體」</p>
+          </header>
+
+          <div class="slide-body grid-2" style="align-items: center;">
+            <div style="display: grid; gap: var(--space-md);">
+              <div class="panel">
+                <h2 class="panel-title"><i data-lucide="sparkles" style="width:17px;height:17px;color:var(--primary);" aria-hidden="true"></i> 課程核心學習目標</h2>
+                <p class="muted-text" style="line-height:1.65;">
+                  本簡報整合 8 篇 AI Agents 經典與前沿論文，帶你系統性掌握自主代理的四分法架構、Toolformer 工具調用、ReAct 推理行動閉環、三維記憶檢索與反思機制，並延伸至 AutoGen 多代理協作、AgentBench 評估基準與安全防禦架構。
+                </p>
+              </div>
+              <div class="grid-3">
+                <div class="panel-well">
+                  <div class="badge is-indigo" style="margin-bottom:6px;">架構基石</div>
+                  <div style="font-weight:600;font-size:0.9rem;">四分法模組</div>
+                  <p class="muted-text" style="font-size:0.78rem;">Profile / Memory / Planning / Action</p>
+                </div>
+                <div class="panel-well">
+                  <div class="badge" style="margin-bottom:6px;">認知閉環</div>
+                  <div style="font-weight:600;font-size:0.9rem;">ReAct 與記憶</div>
+                  <p class="muted-text" style="font-size:0.78rem;">思考行動協同與三維檢索</p>
+                </div>
+                <div class="panel-well">
+                  <div class="badge is-violet" style="margin-bottom:6px;">系統實戰</div>
+                  <div style="font-weight:600;font-size:0.9rem;">協作與評測</div>
+                  <p class="muted-text" style="font-size:0.78rem;">MAS、AgentBench 與安全防禦</p>
+                </div>
+              </div>
+              <div style="display:flex;gap:var(--space-sm);flex-wrap:wrap;">
+                <button type="button" class="btn btn-primary" onclick="goToSlide(2)">
+                  <span>開始探索第 2 頁</span>
+                  <i data-lucide="arrow-right" style="width:16px;height:16px;" aria-hidden="true"></i>
+                </button>
+                <button type="button" class="btn" onclick="goToSlide(11)">
+                  <span>前往隨堂小測驗</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Hero Architecture Diagram SVG -->
+            <div class="panel" style="height:100%;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+              <svg viewBox="0 0 440 300" style="width:100%;max-height:290px;" aria-hidden="true">
+                <defs>
+                  <marker id="arrow-cyan" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+                  </marker>
+                  <marker id="arrow-indigo" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--primary)" />
+                  </marker>
+                </defs>
+                <!-- Center LLM Core -->
+                <circle cx="220" cy="145" r="52" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="2" />
+                <text x="220" y="140" text-anchor="middle" fill="var(--on-surface)" font-size="14" font-weight="700">LLM 引擎</text>
+                <text x="220" y="159" text-anchor="middle" fill="var(--tertiary)" font-size="10.5" font-family="JetBrains Mono">Core Reasoning</text>
+
+                <!-- 4 Orbiting Modules -->
+                <rect x="24" y="24" width="128" height="54" rx="8" fill="var(--surface-container-high)" stroke="var(--primary)" stroke-width="1.5" />
+                <text x="88" y="47" text-anchor="middle" fill="var(--on-surface)" font-size="12.5" font-weight="600">Profile 角色設定</text>
+                <text x="88" y="64" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">人口、性格與社會關係</text>
+
+                <rect x="288" y="24" width="128" height="54" rx="8" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="1.5" />
+                <text x="352" y="47" text-anchor="middle" fill="var(--on-surface)" font-size="12.5" font-weight="600">Memory 記憶系統</text>
+                <text x="352" y="64" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">記憶流、檢索與反思</text>
+
+                <rect x="24" y="212" width="128" height="54" rx="8" fill="var(--surface-container-high)" stroke="var(--violet-accent)" stroke-width="1.5" />
+                <text x="88" y="235" text-anchor="middle" fill="var(--on-surface)" font-size="12.5" font-weight="600">Planning 任務規劃</text>
+                <text x="88" y="252" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">目標拆解與回饋修正</text>
+
+                <rect x="288" y="212" width="128" height="54" rx="8" fill="var(--surface-container-high)" stroke="var(--positive)" stroke-width="1.5" />
+                <text x="352" y="235" text-anchor="middle" fill="var(--on-surface)" font-size="12.5" font-weight="600">Action 行動執行</text>
+                <text x="352" y="252" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">工具調用與環境互動</text>
+
+                <!-- Connectors -->
+                <line x1="142" y1="78" x2="180" y2="110" stroke="var(--primary)" stroke-width="1.5" marker-end="url(#arrow-indigo)" />
+                <line x1="298" y1="78" x2="260" y2="110" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arrow-cyan)" />
+                <line x1="180" y1="182" x2="142" y2="212" stroke="var(--primary)" stroke-width="1.5" marker-end="url(#arrow-indigo)" />
+                <line x1="260" y1="182" x2="298" y2="212" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arrow-cyan)" />
+
+                <!-- Environment Loop at Bottom -->
+                <path d="M 352 268 Q 220 295 88 268" fill="none" stroke="var(--outline)" stroke-dasharray="4 3" stroke-width="1.5" />
+                <text x="220" y="290" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10.5">感知環境回饋 · 持續演化</text>
+              </svg>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Wang et al. (2024) arXiv:2308.11432；Yao et al. (2023) ReAct；Park et al. (2023) Generative Agents；Wu et al. (2024) AutoGen</span>
+            <span>SLIDE 01</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 2: Paradigm Shift -->
+        <section class="slide" data-slide="2" aria-label="第 2 頁：範式轉移">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag">02 // 範式演進對比</span>
+              <span class="badge is-warning">實證：單純 LLM 真實任務成功率僅 12%–14%</span>
+            </div>
+            <h2 class="slide-title">從被動文本生成器到自主 AI Agent：為何需要新範式？</h2>
+            <p class="slide-subtitle">傳統思維鏈（CoT）屬於靜態黑箱推理，缺乏外部環境接地（Grounding），容易發生事實幻覺與錯誤累積</p>
+          </header>
+
+          <div class="slide-body" style="grid-template-rows: minmax(0, 1fr) auto;">
+            <div class="grid-4" style="align-items: stretch;">
+              <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+                <span class="badge is-error">A. Standard 標準提示</span>
+                <div style="font-weight:600;">單次輸入 → 直接輸出</div>
+                <div class="panel-well" style="font-size:0.78rem;color:var(--on-surface-variant);">
+                  <div>Input: 問題</div>
+                  <div style="color:var(--primary);margin:4px 0;">↓ 無中間推理</div>
+                  <div>Output: 直接給答案</div>
+                </div>
+                <p class="muted-text" style="font-size:0.78rem;">無法拆解多步驟問題，遇到需要外部檢索或計算的任務即失效。</p>
+              </div>
+
+              <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+                <span class="badge is-warning">B. CoT 僅推理</span>
+                <div style="font-weight:600;">靜態內部思維鏈</div>
+                <div class="panel-well" style="font-size:0.78rem;color:var(--on-surface-variant);">
+                  <div>Thought 1 → Thought 2</div>
+                  <div style="color:var(--warning);margin:4px 0;">↓ 依賴參數內記憶</div>
+                  <div>易產生「事實幻覺」</div>
+                </div>
+                <p class="muted-text" style="font-size:0.78rem;">雖能規劃推理結構，但無法查證外部世界，一旦某步出錯就會產生錯誤傳播。</p>
+              </div>
+
+              <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+                <span class="badge is-indigo">C. Act-only 僅行動</span>
+                <div style="font-weight:600;">無思考直接觸發工具</div>
+                <div class="panel-well" style="font-size:0.78rem;color:var(--on-surface-variant);">
+                  <div>Action → Observation</div>
+                  <div style="color:var(--error);margin:4px 0;">↓ 缺乏目標追蹤</div>
+                  <div>陷入重複無效動作</div>
+                </div>
+                <p class="muted-text" style="font-size:0.78rem;">缺乏語言工作記憶（Working Memory），難以在長程互動任務中整合線索與調整目標。</p>
+              </div>
+
+              <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);border-color:var(--tertiary);">
+                <span class="badge is-positive">D. AI Agent 自主閉環</span>
+                <div style="font-weight:600;">感知 × 思考 × 行動 × 記憶</div>
+                <div class="panel-well" style="font-size:0.78rem;color:var(--on-surface);">
+                  <div style="color:var(--primary);">Thought（推理規劃）</div>
+                  <div style="color:var(--tertiary);margin:4px 0;">⇄ Action（環境工具）</div>
+                  <div style="color:var(--positive);">⇄ Observation（更新記憶）</div>
+                </div>
+                <p class="muted-text" style="font-size:0.78rem;">將語言推理與外部環境執行緊密結合，透過記憶累積與回饋修正實現長期一致性。</p>
+              </div>
+            </div>
+
+            <div class="panel" style="display:flex;align-items:center;justify-content:space-between;gap:var(--space-md);flex-wrap:wrap;">
+              <div style="display:flex;align-items:center;gap:var(--space-sm);">
+                <i data-lucide="cpu" style="width:18px;height:18px;color:var(--tertiary);" aria-hidden="true"></i>
+                <span style="font-size:0.85rem;"><strong>關鍵演進公式：</strong><code>LLM Agent = LLM 核心引擎 + 角色指令（Instruction）+ 記憶模組 + 規劃與行動介面（Interface）</code></span>
+              </div>
+              <span class="badge">AgentBench：單純 LLM 成功率僅 12%–14%</span>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Yao et al. (2023) ReAct (Fig. 1 對比); Liu et al. (2024) AgentBench; ACM 3773080 Security Survey (Sec. 2.2 &amp; AgentBench 引用)</span>
+            <span>SLIDE 02</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 3: Profile/Memory/Planning/Action 4-Pillar Framework -->
+        <section class="slide" data-slide="3" aria-label="第 3 頁：四分法核心架構">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag">03 // 統一設計框架（Fig. 2）</span>
+              <span class="badge is-indigo">點擊左側四大模組檢視架構細節</span>
+            </div>
+            <h2 class="slide-title">AI Agent 核心四分法：Profile · Memory · Planning · Action</h2>
+            <p class="slide-subtitle">Profile 影響 Memory 與 Planning，三者共同決定 Action 如何與動態環境互動</p>
+          </header>
+
+          <div class="slide-body grid-2" style="align-items: stretch;">
+            <!-- Interactive Architecture Flow Diagram -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);justify-content:space-between;">
+              <svg viewBox="0 0 480 120" style="width:100%;max-height:110px;" aria-hidden="true">
+                <defs>
+                  <marker id="arr-p3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+                  </marker>
+                </defs>
+                <!-- Profile -->
+                <rect x="8" y="25" width="96" height="58" rx="7" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="1.5" />
+                <text x="56" y="49" text-anchor="middle" fill="var(--on-surface)" font-size="12" font-weight="700">Profile</text>
+                <text x="56" y="66" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">角色定位</text>
+
+                <!-- Memory -->
+                <rect x="132" y="8" width="102" height="44" rx="7" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="1.5" />
+                <text x="183" y="27" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="600">Memory 記憶</text>
+                <text x="183" y="42" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">讀 / 寫 / 反思</text>
+
+                <!-- Planning -->
+                <rect x="132" y="64" width="102" height="44" rx="7" fill="var(--surface-container-high)" stroke="var(--violet-accent)" stroke-width="1.5" />
+                <text x="183" y="83" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="600">Planning 規劃</text>
+                <text x="183" y="98" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">推理與回饋修正</text>
+
+                <!-- Action -->
+                <rect x="264" y="25" width="96" height="58" rx="7" fill="var(--surface-container-high)" stroke="var(--positive)" stroke-width="1.5" />
+                <text x="312" y="49" text-anchor="middle" fill="var(--on-surface)" font-size="12" font-weight="700">Action</text>
+                <text x="312" y="66" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">工具與執行</text>
+
+                <!-- Env -->
+                <rect x="386" y="25" width="86" height="58" rx="7" fill="var(--background)" stroke="var(--outline)" stroke-width="1.5" stroke-dasharray="3 2" />
+                <text x="429" y="49" text-anchor="middle" fill="var(--tertiary)" font-size="11.5" font-weight="600">環境</text>
+                <text x="429" y="66" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">Environment</text>
+
+                <line x1="104" y1="45" x2="130" y2="33" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-p3)" />
+                <line x1="104" y1="63" x2="130" y2="78" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-p3)" />
+                <line x1="234" y1="33" x2="262" y2="45" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-p3)" />
+                <line x1="234" y1="78" x2="262" y2="63" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-p3)" />
+                <line x1="360" y1="54" x2="384" y2="54" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-p3)" />
+                <path d="M 429 84 L 429 113 L 183 113 L 183 108" fill="none" stroke="var(--outline)" stroke-width="1.2" stroke-dasharray="3 2" />
+              </svg>
+
+              <div class="grid-2-eq" style="gap:var(--space-sm);">
+                <button type="button" class="pillar-btn active" id="pillar-btn-profile" onclick="selectPillar('profile')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong style="font-size:0.88rem;">1. Profile 角色設定</strong>
+                    <span class="badge is-indigo">身分基石</span>
+                  </div>
+                  <p class="muted-text" style="font-size:0.75rem;margin-top:4px;">人口、性格、社交資訊與三種生成策略</p>
+                </button>
+                <button type="button" class="pillar-btn" id="pillar-btn-memory" onclick="selectPillar('memory')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong style="font-size:0.88rem;">2. Memory 記憶模組</strong>
+                    <span class="badge">經驗累積</span>
+                  </div>
+                  <p class="muted-text" style="font-size:0.75rem;margin-top:4px;">短期上下文 × 長期向量儲存與反思</p>
+                </button>
+                <button type="button" class="pillar-btn" id="pillar-btn-planning" onclick="selectPillar('planning')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong style="font-size:0.88rem;">3. Planning 規劃模組</strong>
+                    <span class="badge is-violet">策略分解</span>
+                  </div>
+                  <p class="muted-text" style="font-size:0.75rem;margin-top:4px;">單路徑/多路徑推理與回饋調適</p>
+                </button>
+                <button type="button" class="pillar-btn" id="pillar-btn-action" onclick="selectPillar('action')">
+                  <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <strong style="font-size:0.88rem;">4. Action 行動模組</strong>
+                    <span class="badge is-positive">環境落地</span>
+                  </div>
+                  <p class="muted-text" style="font-size:0.75rem;margin-top:4px;">行動目標、產生機制、工具空間與影響</p>
+                </button>
+              </div>
+            </div>
+
+            <!-- Pillar Detail Inspector -->
+            <div class="panel" id="pillar-detail-panel" style="display:flex;flex-direction:column;gap:var(--space-sm);justify-content:space-between;">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-xs);">
+                  <span class="badge is-indigo" id="pillar-detail-tag">MODULE 01 // PROFILING</span>
+                </div>
+                <h3 style="margin:0 0 var(--space-xs) 0;font-size:1.15rem;" id="pillar-detail-title">Profile 角色設定模組</h3>
+                <p class="muted-text" id="pillar-detail-desc" style="line-height:1.6;">
+                  透過系統提示詞界定代理的專業角色（如程式開發者、教師、領域專家），進而規範後續記憶提取與任務規劃的行為準則。
+                </p>
+              </div>
+              <div id="pillar-detail-grid" style="display:grid;gap:var(--space-sm);"></div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Wang et al. (2024) "A Survey on Large Language Model based Autonomous Agents" (arXiv:2308.11432v7, Sec. 2.1 &amp; Fig. 2)</span>
+            <span>SLIDE 03</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 4: Toolformer & Tool Use -->
+        <section class="slide" data-slide="4" aria-label="第 4 頁：Toolformer 工具自主調用">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag is-cyan">04 // 行動空間擴展</span>
+              <span class="badge">NeurIPS 2023 · 自監督工具學習</span>
+            </div>
+            <h2 class="slide-title">突破模型參數邊界：Toolformer 如何自學調用外部 API？</h2>
+            <p class="slide-subtitle">透過「位置採樣 → API 執行 → 損失函數過濾」的閉環訓練，讓語言模型自主決定何時與如何呼叫工具</p>
+          </header>
+
+          <div class="slide-body" style="grid-template-rows: auto minmax(0, 1fr);">
+            <!-- Toolformer Pipeline Diagram -->
+            <div class="panel">
+              <svg viewBox="0 0 920 110" style="width:100%;max-height:105px;" aria-hidden="true">
+                <defs>
+                  <marker id="arr-p4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+                  </marker>
+                </defs>
+                <rect x="8" y="18" width="185" height="72" rx="8" fill="var(--background)" stroke="var(--outline)" stroke-width="1.5" />
+                <text x="100" y="42" text-anchor="middle" fill="var(--tertiary)" font-size="11.5" font-weight="600">1. 候選位置採樣</text>
+                <text x="100" y="61" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">計算 p_i(&lt;API&gt;) &gt; 閾值 τ_s</text>
+                <text x="100" y="76" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">最多保留前 k 個插入點</text>
+
+                <rect x="242" y="18" width="195" height="72" rx="8" fill="var(--background)" stroke="var(--primary)" stroke-width="1.5" />
+                <text x="339" y="42" text-anchor="middle" fill="var(--primary)" font-size="11.5" font-weight="600">2. 執行外部 API 呼叫</text>
+                <text x="339" y="61" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">問答 / 計算機 / 維基搜尋 / 翻譯</text>
+                <text x="339" y="76" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">取得實質回傳結果 r_i</text>
+
+                <rect x="486" y="18" width="205" height="72" rx="8" fill="var(--background)" stroke="var(--positive)" stroke-width="1.5" />
+                <text x="588" y="42" text-anchor="middle" fill="var(--positive)" font-size="11.5" font-weight="600">3. 損失降低自監督過濾</text>
+                <text x="588" y="61" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">比較「有無 API 結果」的預測損失</text>
+                <text x="588" y="76" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">僅保留明顯降低誤差的範例</text>
+
+                <rect x="740" y="18" width="172" height="72" rx="8" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="1.5" />
+                <text x="826" y="42" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">4. 微調自主決策</text>
+                <text x="826" y="61" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">推論時零樣本自主插槽</text>
+                <text x="826" y="76" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">數學與知識問答勝過 GPT-3</text>
+
+                <line x1="193" y1="54" x2="238" y2="54" stroke="var(--tertiary)" stroke-width="1.8" marker-end="url(#arr-p4)" />
+                <line x1="437" y1="54" x2="482" y2="54" stroke="var(--tertiary)" stroke-width="1.8" marker-end="url(#arr-p4)" />
+                <line x1="691" y1="54" x2="736" y2="54" stroke="var(--tertiary)" stroke-width="1.8" marker-end="url(#arr-p4)" />
+              </svg>
+            </div>
+
+            <div class="grid-2-eq">
+              <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <strong style="font-size:0.95rem;">實戰預測範例（Toolformer 論文 Figure 1）</strong>
+                  <span class="badge is-indigo">自主插入 API 標記</span>
+                </div>
+                <div class="panel-well" style="font-family:var(--font-label);font-size:0.78rem;line-height:1.6;">
+                  <div><span style="color:var(--on-surface-variant);">機器翻譯：</span>The name derives from "la tortuga", the Spanish word for <span style="color:var(--tertiary);">[MT("tortuga") → turtle]</span> turtle.</div>
+                  <hr style="border:none;border-top:var(--hairline);margin:8px 0;">
+                  <div><span style="color:var(--on-surface-variant);">維基檢索：</span>The Brown Act is California's law <span style="color:var(--positive);">[WikiSearch("Brown Act") → The Ralph M. Brown Act is an act of the California State Legislature…]</span> that requires legislative bodies…</div>
+                </div>
+              </div>
+
+              <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <strong style="font-size:0.95rem;">為何需要自監督工具過濾？</strong>
+                  <span class="badge is-positive">Action Space 核心機制</span>
+                </div>
+                <div style="display:grid;gap:var(--space-xs);font-size:0.84rem;color:var(--on-surface-variant);">
+                  <div class="panel-well">
+                    <strong style="color:var(--on-surface);">1. 不依賴大量人工標註：</strong>僅需少數 Few-shot 提示即可從未標註語料庫自動生成數千筆有效工具呼叫資料。
+                  </div>
+                  <div class="panel-well">
+                    <strong style="color:var(--on-surface);">2. 保留原生語言能力：</strong>僅在 API 回傳確實能幫助預測後續 Token 時才納入訓練，避免無意義濫用工具。
+                  </div>
+                  <div class="panel-well">
+                    <strong style="color:var(--on-surface);">3. 跨基準表現飛躍：</strong>GPT-J 基礎模型在 LAMA 問答與數學計算基準中，藉助 QA 與 Calculator 工具超越體積更大的 GPT-3。
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Schick et al. (2023) "Toolformer: Language Models Can Teach Themselves to Use Tools" (NeurIPS 2023, Fig. 1, Sec. 2 &amp; Table 3)</span>
+            <span>SLIDE 04</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 5: ReAct Closed Loop -->
+        <section class="slide" data-slide="5" aria-label="第 5 頁：ReAct 推理與行動閉環">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag">05 // ReAct 閉環架構</span>
+              <span class="badge is-positive">ALFWorld 成功率：ReAct 71% vs ReAct-IM 53%</span>
+            </div>
+            <h2 class="slide-title">ReAct 閉環：Thought · Action · Observation 的協同循環</h2>
+            <p class="slide-subtitle">將行動空間擴充為 Â = A ∪ L（外部行動 + 語言思考空間），讓推理接地、讓行動有依據</p>
+          </header>
+
+          <div class="slide-body grid-2" style="align-items: stretch;">
+            <!-- Closed-loop Diagram SVG -->
+            <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-sm);">
+              <svg viewBox="0 0 430 230" style="width:100%;max-height:220px;" aria-hidden="true">
+                <defs>
+                  <marker id="arr-react" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+                  </marker>
+                </defs>
+
+                <!-- Thought Node -->
+                <rect id="svg-node-thought" x="145" y="12" width="140" height="58" rx="9" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="2" />
+                <text x="215" y="36" text-anchor="middle" fill="var(--on-surface)" font-size="13" font-weight="700">Thought 推理 (L)</text>
+                <text x="215" y="54" text-anchor="middle" fill="var(--on-primary-container)" font-size="10">拆解子目標 · 更新上下文 c_t</text>
+
+                <!-- Action Node -->
+                <rect id="svg-node-action" x="275" y="136" width="136" height="58" rx="9" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="2" />
+                <text x="343" y="160" text-anchor="middle" fill="var(--on-surface)" font-size="13" font-weight="700">Action 行動 (A)</text>
+                <text x="343" y="178" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">Search / Lookup / Finish</text>
+
+                <!-- Observation Node -->
+                <rect id="svg-node-obs" x="19" y="136" width="142" height="58" rx="9" fill="var(--surface-container-high)" stroke="var(--positive)" stroke-width="2" />
+                <text x="90" y="160" text-anchor="middle" fill="var(--on-surface)" font-size="13" font-weight="700">Observation 觀測</text>
+                <text x="90" y="178" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10">環境回傳真實事實回饋</text>
+
+                <!-- Cycle Arrows -->
+                <path d="M 285 45 Q 352 72 345 132" fill="none" stroke="var(--tertiary)" stroke-width="2" marker-end="url(#arr-react)" />
+                <path d="M 271 165 L 165 165" fill="none" stroke="var(--tertiary)" stroke-width="2" marker-end="url(#arr-react)" />
+                <path d="M 88 132 Q 82 72 141 45" fill="none" stroke="var(--tertiary)" stroke-width="2" marker-end="url(#arr-react)" />
+
+                <text x="215" y="114" text-anchor="middle" fill="var(--on-surface-variant)" font-size="10.5" font-family="JetBrains Mono">π(a_t | c_t) 閉環迭代</text>
+                <text x="215" y="130" text-anchor="middle" fill="var(--tertiary)" font-size="9.5">可與 CoT-SC 互補切換</text>
+              </svg>
+
+              <div class="panel-well" style="font-size:0.8rem;color:var(--on-surface-variant);">
+                <strong style="color:var(--on-surface);">混合知識切換機制：</strong>當 ReAct 超過 5–7 步未果時退回 <code>CoT-SC</code>；當 CoT-SC 多數決信心不足（&lt; n/2）時切換至 <code>ReAct</code> 檢索外部事證。
+              </div>
+            </div>
+
+            <!-- Interactive Step-by-Step ReAct Trace Player -->
+            <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-sm);">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-xs);flex-wrap:wrap;margin-bottom:var(--space-sm);">
+                  <div class="tab-row">
+                    <button type="button" class="tab-pill active" id="react-case-fever" onclick="selectReactCase('fever')">FEVER 事實查核</button>
+                    <button type="button" class="tab-pill" id="react-case-hotpot" onclick="selectReactCase('hotpot')">HotpotQA 多跳推理</button>
+                  </div>
+                  <span class="badge is-indigo" id="react-step-badge">步驟 1 / 4</span>
+                </div>
+                <div class="panel-well" style="margin-bottom:var(--space-sm);font-size:0.82rem;">
+                  <strong style="color:var(--tertiary);">任務題目：</strong>
+                  <span id="react-claim-text">查證命題：「Reign Over Me 是一部於 2010 年製作的美國電影。」</span>
+                </div>
+                <div id="react-trace-list" style="display:grid;gap:var(--space-xs);"></div>
+              </div>
+
+              <div style="display:flex;justify-content:space-between;align-items:center;gap:var(--space-sm);">
+                <span class="muted-text" style="font-size:0.76rem;" id="react-compare-note">對比：純 CoT 在未查證下誤判為 SUPPORTS（幻覺）。</span>
+                <button type="button" class="btn btn-primary btn-sm" onclick="nextReactStep()">
+                  <span>下一步閉環</span>
+                  <i data-lucide="play" style="width:14px;height:14px;" aria-hidden="true"></i>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Yao et al. (2023) "ReAct: Synergizing Reasoning and Acting in Language Models" (ICLR 2023, Sec. 2, Sec. 3.3, Table 3 &amp; Example 3208)</span>
+            <span>SLIDE 05</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 6: Memory Stream & 3D Memory Retrieval -->
+        <section class="slide" data-slide="6" aria-label="第 6 頁：三維記憶檢索架構">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag is-cyan">06 // 三維記憶檢索機制</span>
+              <span class="badge">Generative Agents · 記憶流架構</span>
+            </div>
+            <h2 class="slide-title">長期記憶如何精準提取？三維記憶檢索（Recency · Importance · Relevance）</h2>
+            <p class="slide-subtitle">借鏡人類認知記憶（短期 Context Window + 長期外部記憶流），以三大維度動態評分並提取最相關經驗</p>
+          </header>
+
+          <div class="slide-body grid-2" style="align-items: stretch;">
+            <!-- 3D Memory Retrieval SVG Diagram -->
+            <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-sm);">
+              <svg viewBox="0 0 460 220" style="width:100%;max-height:210px;" aria-hidden="true">
+                <defs>
+                  <marker id="arr-mem" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+                  </marker>
+                </defs>
+
+                <!-- Memory Stream -->
+                <rect x="10" y="34" width="110" height="148" rx="8" fill="var(--background)" stroke="var(--outline-variant)" stroke-width="1.5" />
+                <text x="65" y="56" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">Memory Stream</text>
+                <text x="65" y="72" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">完整自然語言紀錄</text>
+                <rect x="20" y="84" width="90" height="22" rx="4" fill="var(--surface-container)" />
+                <text x="65" y="98" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">觀測 Observation</text>
+                <rect x="20" y="114" width="90" height="22" rx="4" fill="var(--surface-container)" />
+                <text x="65" y="128" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">計畫 Plan</text>
+                <rect x="20" y="144" width="90" height="22" rx="4" fill="var(--surface-container)" />
+                <text x="65" y="158" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">反思 Reflection</text>
+
+                <!-- 3 Scoring Dimensions -->
+                <rect x="165" y="16" width="150" height="48" rx="7" fill="var(--surface-container-high)" stroke="var(--primary)" stroke-width="1.5" />
+                <text x="240" y="37" text-anchor="middle" fill="var(--primary)" font-size="11.5" font-weight="600">1. 時近性 Recency</text>
+                <text x="240" y="53" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">時間越近分數越高（指數衰減）</text>
+
+                <rect x="165" y="84" width="150" height="48" rx="7" fill="var(--surface-container-high)" stroke="var(--warning)" stroke-width="1.5" />
+                <text x="240" y="105" text-anchor="middle" fill="var(--warning)" font-size="11.5" font-weight="600">2. 重要性 Importance</text>
+                <text x="240" y="121" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">LLM 區分日常瑣事與核心事件</text>
+
+                <rect x="165" y="152" width="150" height="48" rx="7" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="1.5" />
+                <text x="240" y="173" text-anchor="middle" fill="var(--tertiary)" font-size="11.5" font-weight="600">3. 相關性 Relevance</text>
+                <text x="240" y="189" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">與當前查詢的語意相似度</text>
+
+                <!-- Output Top-K -->
+                <rect x="355" y="64" width="95" height="90" rx="8" fill="var(--primary-container)" stroke="var(--tertiary)" stroke-width="1.8" />
+                <text x="402" y="94" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">加權整合</text>
+                <text x="402" y="112" text-anchor="middle" fill="var(--tertiary)" font-size="10">Top-K 提取</text>
+                <text x="402" y="130" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">注入 Prompt</text>
+
+                <line x1="120" y1="80" x2="162" y2="42" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-mem)" />
+                <line x1="120" y1="108" x2="162" y2="108" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-mem)" />
+                <line x1="120" y1="136" x2="162" y2="174" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-mem)" />
+
+                <line x1="315" y1="42" x2="352" y2="88" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-mem)" />
+                <line x1="315" y1="108" x2="352" y2="108" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-mem)" />
+                <line x1="315" y1="174" x2="352" y2="128" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-mem)" />
+              </svg>
+
+              <div class="panel-well" style="font-size:0.79rem;color:var(--on-surface-variant);">
+                <strong style="color:var(--on-surface);">檢索失誤提醒：</strong>若三維檢索未能抓回正確片段（如 Rajiv Patel 雖聽聞 Sam 參選卻回答「未密切關注選舉」），會導致角色行為一致性下降。
+              </div>
+            </div>
+
+            <!-- Interactive Retrieval Weight Simulator -->
+            <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-sm);">
+              <div>
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:var(--space-xs);">
+                  <strong style="font-size:0.92rem;">三維檢索權重模擬器（情境：Maria 思考傍晚行程）</strong>
+                  <button type="button" class="btn btn-sm" onclick="resetMemoryWeights()">重設權重</button>
+                </div>
+
+                <div class="grid-3" style="gap:var(--space-sm);margin-bottom:var(--space-sm);">
+                  <div class="slider-group">
+                    <label for="w-recency" class="slider-label-row">
+                      <span>時近性 α</span>
+                      <span id="val-recency" style="font-family:var(--font-label);color:var(--primary);">1.0</span>
+                    </label>
+                    <input type="range" id="w-recency" min="0" max="2" step="0.2" value="1.0" oninput="updateMemoryRanking()">
+                  </div>
+                  <div class="slider-group">
+                    <label for="w-importance" class="slider-label-row">
+                      <span>重要性 β</span>
+                      <span id="val-importance" style="font-family:var(--font-label);color:var(--warning);">1.0</span>
+                    </label>
+                    <input type="range" id="w-importance" min="0" max="2" step="0.2" value="1.0" oninput="updateMemoryRanking()">
+                  </div>
+                  <div class="slider-group">
+                    <label for="w-relevance" class="slider-label-row">
+                      <span>相關性 γ</span>
+                      <span id="val-relevance" style="font-family:var(--font-label);color:var(--tertiary);">1.0</span>
+                    </label>
+                    <input type="range" id="w-relevance" min="0" max="2" step="0.2" value="1.0" oninput="updateMemoryRanking()">
+                  </div>
+                </div>
+
+                <div id="memory-ranked-list" style="display:grid;gap:var(--space-xs);"></div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Park et al. (2023) "Generative Agents: Interactive Simulacra of Human Behavior" (Fig. 5, Sec. 4 &amp; Sec. 6); Wang et al. (2024) Sec. 2.1.2</span>
+            <span>SLIDE 06</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 7: Reflection, Planning & Emergent Social Behavior -->
+        <section class="slide" data-slide="7" aria-label="第 7 頁：反思與規劃與湧現社交行為">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag is-violet">07 // 高階認知與湧現</span>
+              <span class="badge is-indigo">Smallville 虛擬小鎮實證</span>
+            </div>
+            <h2 class="slide-title">從記憶到抽象洞見：Reflection 反思、Planning 規劃與湧現社交行為</h2>
+            <p class="slide-subtitle">低階記憶流透過「階層式反思」濃縮為高階自我認知，再搭配由上而下的遞迴規劃，湧現出未經寫死的社交協調</p>
+          </header>
+
+          <div class="slide-body grid-2-eq">
+            <!-- Left: Hierarchical Reflection Tree -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong style="font-size:0.95rem;">階層式反思（Memory Reflection）</strong>
+                <span class="badge is-violet">Klaus Mueller 案例</span>
+              </div>
+              <svg viewBox="0 0 430 190" style="width:100%;max-height:185px;" aria-hidden="true">
+                <defs>
+                  <marker id="arr-ref" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                    <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--violet-accent)" />
+                  </marker>
+                </defs>
+                <!-- High level insight -->
+                <rect x="65" y="10" width="300" height="44" rx="8" fill="var(--primary-container)" stroke="var(--violet-accent)" stroke-width="1.8" />
+                <text x="215" y="29" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">高階洞見：「Klaus Mueller 非常專注於他的研究」</text>
+                <text x="215" y="45" text-anchor="middle" fill="var(--violet-accent)" font-size="9.5">經 3 個關鍵問題檢索後歸納（可再遞迴生成更高層反思）</text>
+
+                <!-- Low level observations -->
+                <rect x="10" y="106" width="128" height="66" rx="6" fill="var(--background)" stroke="var(--outline-variant)" />
+                <text x="74" y="128" text-anchor="middle" fill="var(--on-surface)" font-size="10">觀測記憶 1</text>
+                <text x="74" y="145" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">正在撰寫一篇</text>
+                <text x="74" y="160" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">學術研究論文</text>
+
+                <rect x="151" y="106" width="128" height="66" rx="6" fill="var(--background)" stroke="var(--outline-variant)" />
+                <text x="215" y="128" text-anchor="middle" fill="var(--on-surface)" font-size="10">觀測記憶 2</text>
+                <text x="215" y="145" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">與圖書館員交流</text>
+                <text x="215" y="160" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">以推進研究進度</text>
+
+                <rect x="292" y="106" width="128" height="66" rx="6" fill="var(--background)" stroke="var(--outline-variant)" />
+                <text x="356" y="128" text-anchor="middle" fill="var(--on-surface)" font-size="10">觀測記憶 3</text>
+                <text x="356" y="145" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">與 Ayesha Khan</text>
+                <text x="356" y="160" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">討論研究課題</text>
+
+                <line x1="74" y1="106" x2="160" y2="57" stroke="var(--violet-accent)" stroke-width="1.5" marker-end="url(#arr-ref)" />
+                <line x1="215" y1="106" x2="215" y2="57" stroke="var(--violet-accent)" stroke-width="1.5" marker-end="url(#arr-ref)" />
+                <line x1="356" y1="106" x2="270" y2="57" stroke="var(--violet-accent)" stroke-width="1.5" marker-end="url(#arr-ref)" />
+              </svg>
+              <div class="panel-well" style="font-size:0.8rem;color:var(--on-surface-variant);">
+                <strong style="color:var(--on-surface);">由上而下遞迴規劃：</strong>先草擬整日粗略行程，再細化為具體時間、地點與動作（如「2/12 9:00 起在宿舍書桌閱讀與筆記 180 分鐘」），並能依突發事件動態改寫。
+              </div>
+            </div>
+
+            <!-- Right: Emergent Social Behaviors in Smallville -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong style="font-size:0.95rem;">Smallville 湧現社交行為實錄（無人工腳本）</strong>
+                <span class="badge is-positive">3 大湧現現象</span>
+              </div>
+              <div style="display:grid;gap:var(--space-xs);font-size:0.82rem;">
+                <div class="panel-well">
+                  <div style="color:var(--tertiary);font-weight:600;margin-bottom:2px;">1. 資訊擴散（Information Diffusion）</div>
+                  <div class="muted-text">Sam 在雜貨店告訴 Tom 自己要參選鎮長後，選舉消息透過代理間日常對話自然傳遍小鎮。</div>
+                </div>
+                <div class="panel-well">
+                  <div style="color:var(--primary);font-weight:600;margin-bottom:2px;">2. 關係記憶（Relationship Memory）</div>
+                  <div class="muted-text">Sam 偶遇 Latoya 得知她在進行攝影計畫；日後再遇時主動關心：「Hi, Latoya. 你的攝影計畫進展如何？」</div>
+                </div>
+                <div class="panel-well" style="border-color:var(--positive);">
+                  <div style="color:var(--positive);font-weight:600;margin-bottom:2px;">3. 自主活動協調（Valentine's Day Party）</div>
+                  <div class="muted-text">
+                    使用者僅設定初始種子：Isabella 想在 2/14 17:00–19:00 於 Hobbs Cafe 舉辦派對、Maria 暗戀 Klaus。<br>
+                    <strong>結果：</strong>Isabella 主動發送邀請並於 2/13 佈置咖啡廳、邀 Maria 幫忙；Maria 鼓起勇氣邀請 Klaus；最終 5 位代理準時現身共度派對！
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Park et al. (2023) "Generative Agents" (Sec. 3.4 &amp; Sec. 4); Wang et al. (2024) Memory Reflection (Sec. 2.1.2)</span>
+            <span>SLIDE 07</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 8: Multi-Agent Systems & AutoGen -->
+        <section class="slide" data-slide="8" aria-label="第 8 頁：多代理協作與 AutoGen">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag">08 // 多代理協作系統（MAS）</span>
+              <span class="badge is-indigo">點選切換 3 種業界主流多代理拓撲</span>
+            </div>
+            <h2 class="slide-title">從單兵作戰到團隊協作：Multi-Agent Systems 與 AutoGen 範式</h2>
+            <p class="slide-subtitle">代理形式化為 a = {m, o, e, x, y}，透過可對話代理與對話程式設計完成跨專業分工與除錯</p>
+          </header>
+
+          <div class="slide-body grid-2" style="align-items: stretch;">
+            <!-- Left: Interactive Topology Viewer -->
+            <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-sm);">
+              <div class="tab-row">
+                <button type="button" class="tab-pill active" id="mas-tab-autogen" onclick="selectMasTopology('autogen')">AutoGen 對話接地</button>
+                <button type="button" class="tab-pill" id="mas-tab-swarm" onclick="selectMasTopology('swarm')">OpenAI Swarm 交接</button>
+                <button type="button" class="tab-pill" id="mas-tab-magentic" onclick="selectMasTopology('magentic')">Magentic-One 調度</button>
+              </div>
+              <div class="panel-well" id="mas-svg-container" style="flex:1;display:flex;align-items:center;justify-content:center;"></div>
+              <p class="muted-text" id="mas-caption" style="font-size:0.8rem;"></p>
+            </div>
+
+            <!-- Right: Key Frameworks & Real-world Impact -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);justify-content:space-between;">
+              <div>
+                <h3 class="panel-title"><i data-lucide="network" style="width:17px;height:17px;color:var(--tertiary);" aria-hidden="true"></i> 多代理協作核心優勢與應用矩陣</h3>
+                <div style="display:grid;gap:var(--space-xs);font-size:0.82rem;">
+                  <div class="panel-well">
+                    <strong style="color:var(--primary);">AutoGen 對話程式設計：</strong>將應用統一為多代理對話，融合自然語言控制與 Python 終止條件；在供應鏈 OptiGuide 系統中將核心程式碼從 <strong>430+ 行縮減至 100 行</strong>。
+                  </div>
+                  <div class="panel-well">
+                    <strong style="color:var(--tertiary);">專業分工實踐：</strong>MetaGPT / ChatDev（產品經理、設計與程式員）、MedAgent（多專科醫師會診）、MARG（論文同儕審查）、AgentCF（用戶與物品雙代理推薦）。
+                  </div>
+                  <div class="panel-well">
+                    <strong style="color:var(--violet-accent);">IBM Bee 框架亮點：</strong>支援代理狀態「序列化（Serialization）」，可在複雜長程工作流中安全暫停並無損恢復執行。
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;justify-content:space-between;align-items:center;font-size:0.78rem;color:var(--on-surface-variant);">
+                <span>公式：<code>y = m(o, e, x)</code>，其中 <code>m = {arch, mem, adp}</code></span>
+                <span class="badge is-positive">支援 Human-in-the-loop</span>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Wu et al. (2024) "AutoGen"; Tran et al. (2025) "Multi-Agent Collaboration Mechanisms: A Survey of LLMs" (arXiv:2501.06322v1, Sec. 3 &amp; Sec. 5.2)</span>
+            <span>SLIDE 08</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 9: AgentBench Evaluation -->
+        <section class="slide" data-slide="9" aria-label="第 9 頁：AgentBench 基準評估">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag is-cyan">09 // 標準化基準評測</span>
+              <span class="badge is-indigo">ICLR 2024 · 評測 29 款 LLM 模型</span>
+            </div>
+            <h2 class="slide-title">如何衡量代理能力？AgentBench 八大真實互動環境與核心瓶頸</h2>
+            <p class="slide-subtitle">涵蓋程式指令、策略博弈與網頁具身三大領域，揭露「商業 API vs ≤70B 開源模型落差」與 TLE 無限重複現象</p>
+          </header>
+
+          <div class="slide-body grid-2" style="align-items: stretch;">
+            <!-- Left: 8 Environments Table -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+              <strong style="font-size:0.92rem;">AgentBench 8 大互動測試環境（Table 2 統計）</strong>
+              <table class="tech-table">
+                <thead>
+                  <tr>
+                    <th>類別</th>
+                    <th>測試環境</th>
+                    <th class="num-cell">平均輪數</th>
+                    <th>評分指標</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><span class="badge is-indigo">Code 程式</span></td>
+                    <td>作業系統 (OS · Ubuntu Docker)</td>
+                    <td class="num-cell">8</td>
+                    <td>成功率 (SR)</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge is-indigo">Code 程式</span></td>
+                    <td>資料庫 (DB · SQL 查詢/增改)</td>
+                    <td class="num-cell">5</td>
+                    <td>成功率 (SR)</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge is-indigo">Code 程式</span></td>
+                    <td>知識圖譜 (KG)</td>
+                    <td class="num-cell">15</td>
+                    <td>F1 分數</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge is-violet">Game 博弈</span></td>
+                    <td>數位卡牌對戰 (Card Game)</td>
+                    <td class="num-cell">30</td>
+                    <td>Reward</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge is-violet">Game 博弈</span></td>
+                    <td>海龜湯推理 (Lateral Thinking)</td>
+                    <td class="num-cell">25</td>
+                    <td>推論進度</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge">Web / 具身</span></td>
+                    <td>居家環境任務 (House-Holding)</td>
+                    <td class="num-cell">35</td>
+                    <td>成功率 (SR)</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge">Web / 具身</span></td>
+                    <td>網路購物 (Web Shopping)</td>
+                    <td class="num-cell">5</td>
+                    <td>Reward</td>
+                  </tr>
+                  <tr>
+                    <td><span class="badge">Web / 具身</span></td>
+                    <td>網頁瀏覽操作 (Web Browsing)</td>
+                    <td class="num-cell">10</td>
+                    <td>Step SR</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Right: Key Empirical Bottlenecks -->
+            <div class="panel" style="display:flex;flex-direction:column;justify-content:space-between;gap:var(--space-sm);">
+              <div>
+                <strong style="font-size:0.92rem;">實證分析：為何多輪任務常失敗？</strong>
+                <div style="display:grid;gap:var(--space-sm);margin-top:var(--space-sm);">
+                  <div class="panel-well">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                      <strong style="color:var(--error);font-size:0.86rem;">主因一：TLE（超過任務輪數上限）</strong>
+                      <span class="badge is-error">高重複率陷阱</span>
+                    </div>
+                    <p class="muted-text" style="font-size:0.8rem;">
+                      研究以 ROUGE-L 指標偵測發現：大量任務失敗源自模型在最後幾輪<strong>反覆輸出幾乎相同的內容</strong>，陷入死胡同而耗盡輪數上限。
+                    </p>
+                  </div>
+                  <div class="panel-well">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                      <strong style="color:var(--warning);font-size:0.86rem;">主因二：商業 API vs 開源模型鴻溝</strong>
+                      <span class="badge is-warning">指令遵循落差</span>
+                    </div>
+                    <p class="muted-text" style="font-size:0.8rem;">
+                      評測 29 款模型顯示，頂尖商業 API 模型遠超參數規模 ≤70B 的開源模型；開源模型常因格式錯誤、長期推理與指令遵循能力不足而提前中斷。
+                    </p>
+                  </div>
+                  <div class="panel-well">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                      <strong style="color:var(--tertiary);font-size:0.86rem;">發現三：程式碼訓練的雙面刃效應</strong>
+                      <span class="badge">權衡取捨</span>
+                    </div>
+                    <p class="muted-text" style="font-size:0.8rem;">
+                      強化程式碼訓練雖有助於 OS / DB 等結構化任務，卻可能在其他需要常識或開放式互動的代理任務上造成表現下滑。
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div style="font-size:0.78rem;color:var(--on-surface-variant);">
+                架構貢獻：採用 HTTP Server–Client 模組化設計，可標準化評估任意 LLM。
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：Liu et al. (2024) "AgentBench: Evaluating LLMs as Agents" (ICLR 2024, Sec. 3, Table 2 &amp; Appendix J.2.4)</span>
+            <span>SLIDE 09</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 10: Security, Privacy & Defenses -->
+        <section class="slide" data-slide="10" aria-label="第 10 頁：安全隱私風險與防禦策略">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag is-violet">10 // 安全與隱私治理</span>
+              <span class="badge is-error">虛擬小鎮評測：僅 38.5% 兼顧隱私與權限安全</span>
+            </div>
+            <h2 class="slide-title">當代理能操作真實工具：安全威脅分類與縱深防禦架構</h2>
+            <p class="slide-subtitle">除繼承自底層 LLM 的脆弱性外，Agent 專屬的工具權限與多代理通訊更帶來知識投毒與連鎖誤導風險</p>
+          </header>
+
+          <div class="slide-body grid-2-eq">
+            <!-- Threats Column -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong style="color:var(--error);font-size:0.95rem;">兩大威脅來源分類</strong>
+                <span class="badge is-error">風險面放大</span>
+              </div>
+              <div class="panel-well" style="display:grid;gap:6px;">
+                <div style="font-weight:600;font-size:0.86rem;">1. 繼承自 LLM 的威脅（Inherited Threats）</div>
+                <div class="muted-text" style="font-size:0.79rem;">
+                  <strong>技術脆弱性：</strong>幻覺（Hallucination）、災難性遺忘、複雜推理誤解。<br>
+                  <strong>惡意攻擊：</strong>越獄（Jailbreaking）套取商業機密、提示詞注入（Prompt Injection）、訓練資料萃取與成員推論攻擊。
+                </div>
+              </div>
+              <div class="panel-well" style="display:grid;gap:6px;">
+                <div style="font-weight:600;font-size:0.86rem;">2. 代理專屬威脅（Agent-Specific Threats）</div>
+                <div class="muted-text" style="font-size:0.79rem;">
+                  <strong>知識投毒：</strong>污染外部知識庫或記憶流，誘發錯誤決策。<br>
+                  <strong>輸出與功能操縱：</strong>欺騙人類或誤導下游工具執行高風險操作。<br>
+                  <strong>多代理連鎖效應：</strong>單一節點產生幻覺或被動竊聽 / 主動散播釣魚與惡意檔案，會沿通訊拓撲擴散至整個系統。
+                </div>
+              </div>
+            </div>
+
+            <!-- Defenses Column -->
+            <div class="panel" style="display:flex;flex-direction:column;gap:var(--space-sm);">
+              <div style="display:flex;justify-content:space-between;align-items:center;">
+                <strong style="color:var(--positive);font-size:0.95rem;">核心防禦機制與實證成效（Table 3）</strong>
+                <span class="badge is-positive">縱深防禦</span>
+              </div>
+              <div style="display:grid;gap:var(--space-xs);font-size:0.8rem;">
+                <div class="panel-well" style="border-color:color-mix(in srgb, var(--positive) 45%, transparent);">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                    <strong style="color:var(--positive);">AirGapAgent（隱私與輸出防禦）</strong>
+                    <span class="badge is-positive">97% 隱私保護</span>
+                  </div>
+                  <div class="muted-text" style="font-size:0.78rem;">實施資料最小化、上下文隔離（Context Isolation）與請求升級審核，在 97% 隱私防護下仍維持 <strong>88%–90%</strong> 任務效用。</div>
+                </div>
+                <div class="panel-well">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                    <strong style="color:var(--tertiary);">ToolEmu（功能操縱動態沙盒）</strong>
+                    <span class="badge">減少 96.9% 建置時間</span>
+                  </div>
+                  <div class="muted-text" style="font-size:0.78rem;">以語言模型模擬高風險工具執行並搭配自動安全評估器，在標準與對抗測試中分別達成 72.5% 與 68.8% 風險辨識精確率。</div>
+                </div>
+                <div class="panel-well">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px;">
+                    <strong style="color:var(--primary);">ParaFuzz &amp; SAUP &amp; ReCon</strong>
+                    <span class="badge is-indigo">投毒與不確定性治理</span>
+                  </div>
+                  <div class="muted-text" style="font-size:0.78rem;">ParaFuzz 以模型可解釋性偵測投毒；SAUP 跨推理步驟傳播不確定性（AUROC 提升達 20%）；ReCon 結合觀點轉換強化反欺騙能力。</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">引用出處：ACM 3773080 Security &amp; Privacy Survey (Sec. 3, Sec. 4.1, Sec. 5.3, Sec. 6.2 &amp; Table 3: AirGapAgent, ToolEmu, ParaFuzz, SAUP, ReCon)</span>
+            <span>SLIDE 10</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 11: Interactive 3-Question Quiz -->
+        <section class="slide" data-slide="11" aria-label="第 11 頁：互動式小測驗">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag">11 // 學習檢核小測驗</span>
+              <div style="display:flex;align-items:center;gap:var(--space-sm);">
+                <span class="badge is-indigo" id="quiz-score-badge">已作答 0 / 3 題 · 得分 0 / 3</span>
+                <button type="button" class="btn btn-sm" onclick="resetQuiz()">
+                  <i data-lucide="rotate-ccw" style="width:14px;height:14px;" aria-hidden="true"></i>
+                  <span>重新作答</span>
+                </button>
+              </div>
+            </div>
+            <h2 class="slide-title">隨堂知識核對：測驗你對 AI Agents 核心機制的掌握度</h2>
+            <p class="slide-subtitle">點選各題選項即可即時對錯核對並查看論文解析；可隨時點擊「重新作答」清除紀錄</p>
+          </header>
+
+          <div class="slide-body quiz-grid" id="quiz-container"></div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">出題依據：Yao et al. (2023) ReAct；Park et al. (2023) Generative Agents；ACM 3773080 Security Survey</span>
+            <span>SLIDE 11</span>
+          </footer>
+        </section>
+
+        <!-- SLIDE 12: Complete 8 References -->
+        <section class="slide" data-slide="12" aria-label="第 12 頁：完整參考資料">
+          <header class="slide-header">
+            <div class="slide-meta-row">
+              <span class="slide-tag is-cyan">12 // 學術參考文獻</span>
+              <span class="badge is-positive">完整收錄本簡報 8 篇核心論文</span>
+            </div>
+            <h2 class="slide-title">參考資料總覽：從單體推理到多代理安全之 8 篇關鍵文獻</h2>
+            <p class="slide-subtitle">本簡報所有架構圖解、實驗數據與機制解析皆嚴謹對應以下八篇原始研究論文</p>
+          </header>
+
+          <div class="slide-body ref-grid">
+            <div class="ref-card">
+              <span class="ref-num">01</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">ReAct: Synergizing Reasoning and Acting in Language Models</div>
+                <div class="muted-text" style="font-size:0.75rem;">Shunyu Yao et al. · ICLR 2023 · 提出 Thought–Action–Observation 閉環與 ALFWorld / HotpotQA 實證</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">02</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">Toolformer: Language Models Can Teach Themselves to Use Tools</div>
+                <div class="muted-text" style="font-size:0.75rem;">Timo Schick et al. · NeurIPS 2023 · 自監督採樣與損失過濾 API 調用學習框架</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">03</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">Generative Agents: Interactive Simulacra of Human Behavior</div>
+                <div class="muted-text" style="font-size:0.75rem;">Joon Sung Park et al. · ACM UIST 2023 · Smallville 記憶流、三維檢索、反思與遞迴規劃</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">04</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">A Survey on Large Language Model based Autonomous Agents</div>
+                <div class="muted-text" style="font-size:0.75rem;">Lei Wang et al. · arXiv:2308.11432v7 · 提出 Profile / Memory / Planning / Action 四分法統一框架</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">05</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">AgentBench: Evaluating LLMs as Agents</div>
+                <div class="muted-text" style="font-size:0.75rem;">Xiao Liu et al. · ICLR 2024 · 八大互動測試環境、29 款模型基準與 TLE 重複瓶頸分析</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">06</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">AutoGen: Enabling Next-Gen LLM Applications via Multi-Agent Conversation</div>
+                <div class="muted-text" style="font-size:0.75rem;">Qingyun Wu et al. · Microsoft Research &amp; Penn State (2024) · 可對話代理與對話程式設計</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">07</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">Multi-Agent Collaboration Mechanisms: A Survey of LLMs</div>
+                <div class="muted-text" style="font-size:0.75rem;">Khanh-Tung Tran et al. · arXiv:2501.06322v1 (2025) · MAS 數學定義、Swarm、Magentic-One 與 Bee</div>
+              </div>
+            </div>
+
+            <div class="ref-card">
+              <span class="ref-num">08</span>
+              <div>
+                <div style="font-weight:600;font-size:0.84rem;">Security and Privacy of LLM-Based Agents: Threats, Impacts, and Defenses</div>
+                <div class="muted-text" style="font-size:0.75rem;">ACM 3773080 Survey · 系統性整理繼承/專屬威脅、虛擬小鎮風險與 AirGapAgent / ToolEmu 防禦</div>
+              </div>
+            </div>
+          </div>
+
+          <footer class="slide-footer">
+            <span class="citation-line">感謝學習！可使用上方「章節目錄」或左下角按鈕回顧任一架構頁面</span>
+            <span>SLIDE 12 // END</span>
+          </footer>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Bottom Controls -->
+    <div class="deck-bottombar">
+      <button type="button" class="btn" id="btn-prev" onclick="prevSlide()">
+        <i data-lucide="chevron-left" style="width:16px;height:16px;" aria-hidden="true"></i>
+        <span>上一頁</span>
+      </button>
+
+      <div class="nav-dots" id="nav-dots" role="tablist" aria-label="簡報頁碼導覽點"></div>
+
+      <div style="display:flex;align-items:center;gap:var(--space-md);">
+        <span class="kbd-hint">鍵盤 ← / → 切換頁面</span>
+        <button type="button" class="btn btn-primary" id="btn-next" onclick="nextSlide()">
+          <span>下一頁</span>
+          <i data-lucide="chevron-right" style="width:16px;height:16px;" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <api-shim></api-shim>
+  <script>
+    const TOTAL_SLIDES = 12;
+
+    const SLIDE_TITLES = [
+      `AI Agents 是什麼？導論`,
+      `範式轉移：從 LLM 到 Agent`,
+      `四分法核心架構總覽`,
+      `Toolformer 自主工具調用`,
+      `ReAct 推理與行動閉環`,
+      `Memory Stream 與三維檢索`,
+      `反思、規劃與湧現社交`,
+      `Multi-Agent 與 AutoGen`,
+      `AgentBench 基準與瓶頸`,
+      `安全威脅與縱深防禦`,
+      `互動式隨堂小測驗`,
+      `8 篇核心論文參考資料`
+    ];
+
+    const PILLAR_DATA = {
+      profile: {
+        tag: `MODULE 01 // PROFILING`,
+        title: `Profile 角色設定模組`,
+        desc: `透過系統提示詞明確定義代理身分，影響後續記憶提取方向、規劃風格與多代理互動角色。`,
+        items: [
+          { label: `角色資訊內容`, text: `包含基本人口統計資訊（年齡、性別、職業）、心理與性格特質，以及與其他代理之間的社交關係資訊。` },
+          { label: `三種角色生成策略`, text: `1) 手工撰寫（Handcrafting）；2) LLM 自動生成（LLM-Generation）；3) 真實資料集對齊（Dataset Alignment）。` },
+          { label: `混合策略優勢`, text: `可先以真實資料集對齊現有社會分布，再手工指派未來可能出現的新興角色，進行社會發展模擬預測。` }
+        ]
+      },
+      memory: {
+        tag: `MODULE 02 // MEMORY`,
+        title: `Memory 記憶模組`,
+        desc: `儲存從環境感知的經驗並跨時間自我演化，克服 Transformer 有限上下文視窗（Context Window）的限制。`,
+        items: [
+          { label: `記憶結構雙層設計`, text: `短期記憶對應上下文視窗內的近期訊息；長期記憶對應外部向量儲存（Hybrid Memory），可快速查詢提取。` },
+          { label: `多元記憶格式`, text: `自然語言（Languages）、資料庫（Databases）、向量嵌入（Embeddings）與結構化清單（Lists）。` },
+          { label: `三大核心操作`, text: `Memory Reading（檢索讀取）、Memory Writing（寫入更新）與 Memory Reflection（高階抽象反思總結）。` }
+        ]
+      },
+      planning: {
+        tag: `MODULE 03 // PLANNING`,
+        title: `Planning 規劃模組`,
+        desc: `將複雜目標拆解為可執行的步驟序列，並依據是否接收外部回饋動態調整執行路徑。`,
+        items: [
+          { label: `無回饋規劃（w/o Feedback）`, text: `包含單路徑推理（Single-path，如標準思維鏈）、多路徑樹狀推理（Multi-path）與結合外部規劃器（External Planner）。` },
+          { label: `有回饋規劃（w/ Feedback）`, text: `從環境回傳（Environment）、人類修正（Human）與模型自我檢驗（Model Feedback）持續迭代修正計畫。` },
+          { label: `實務應用成效`, text: `如 Minecraft 遊戲代理 DEPS 先產生任務計畫再提示 LLM 執行動作，有效降低長程任務迷失。` }
+        ]
+      },
+      action: {
+        tag: `MODULE 04 // ACTION`,
+        title: `Action 行動模組`,
+        desc: `位於架構最下游，負責將前三個模組的決策轉化為真實輸出並直接作用於環境。`,
+        items: [
+          { label: `行動目標與產生`, text: `涵蓋任務完成、環境探索與代理間溝通；透過回憶提取（Memory Recollection）或遵循計畫（Plan Following）產生。` },
+          { label: `行動空間（Action Space）`, text: `分為外部工具呼叫（計算機、瀏覽器、程式碼執行器、API）與內部自身知識（Self-Knowledge）。` },
+          { label: `行動影響（Action Impact）`, text: `可改變外部環境狀態、更新內部記憶與狀態，甚至如 Voyager 收集資源後自動觸發後續建造新行動。` }
+        ]
+      }
+    };
+
+    const REACT_CASES = {
+      fever: {
+        claim: `查證命題：「Reign Over Me 是一部於 2010 年製作的美國電影。」`,
+        note: `對比：純 CoT 未查證即誤判為 SUPPORTS；Act-only 亦因缺少推理整合而誤答。`,
+        steps: [
+          { type: `Thought 1`, color: `var(--primary)`, text: `我需要先搜尋 Reign Over Me，確認它是否為 2010 年製作的美國電影。` },
+          { type: `Action 1`, color: `var(--tertiary)`, text: `Search[Reign Over Me]` },
+          { type: `Observation 1`, color: `var(--positive)`, text: `《Reign Over Me》是一部於 2007 年上映的美國劇情電影…` },
+          { type: `Thought 2 & Action 2`, color: `var(--primary)`, text: `觀測顯示電影製作於 2007 年而非 2010 年 → Finish[REFUTES]（正確駁斥）。` }
+        ]
+      },
+      hotpot: {
+        claim: `多跳問答：「結合 Wikipedia API 檢索以回答跨文件關聯問題（如 HotpotQA）。」`,
+        note: `當推理遇阻時，Thought 能動態改寫搜尋關鍵字，避免單純檢索陷入死胡同。`,
+        steps: [
+          { type: `Thought 1`, color: `var(--primary)`, text: `將問題拆解為兩個子實體檢索目標，先查詢核心條目以取得關鍵年份或人物線索。` },
+          { type: `Action 1`, color: `var(--tertiary)`, text: `Search[Soyuz] / Lookup[相關段落]` },
+          { type: `Observation 1`, color: `var(--positive)`, text: `回傳結果未直接提及「美國太空計畫」，需要進一步精準檢索第二跳目標。` },
+          { type: `Thought 2 & Action 2`, color: `var(--primary)`, text: `依觀測修正搜尋策略 → Search["American space program"] 並綜整最終答案。` }
+        ]
+      }
+    };
+
+    const MEMORY_ITEMS = [
+      {
+        id: `m1`,
+        text: `剛與 Isabella 對話，受託協助籌備明天 Hobbs Cafe 的情人節派對佈置。`,
+        recency: 0.95,
+        importance: 0.85,
+        relevance: 0.92,
+        tag: `15 分鐘前`
+      },
+      {
+        id: `m2`,
+        text: `心裡一直暗戀同學 Klaus Mueller，希望能找機會邀請他一起參加活動。`,
+        recency: 0.40,
+        importance: 0.95,
+        relevance: 0.88,
+        tag: `昨日反思`
+      },
+      {
+        id: `m3`,
+        text: `今天早上在公寓廚房喝了一杯黑咖啡並整理桌面筆記。`,
+        recency: 0.72,
+        importance: 0.15,
+        relevance: 0.18,
+        tag: `3 小時前`
+      }
+    ];
+
+    const MAS_TOPOLOGIES = {
+      autogen: {
+        caption: `AutoGen 三代理實戰：當 Assistant 與 Executor 在 ALFWorld 陷入重複開啟檯燈的無限迴圈時，GroundingAgent 介入提醒「必須先找到並拿取碗（bowl 1）才能檢視」，成功打破迴圈完成任務。`,
+        svg: `
+          <svg viewBox="0 0 430 165" style="width:100%;max-height:160px;" aria-hidden="true">
+            <defs>
+              <marker id="arr-m1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+              </marker>
+            </defs>
+            <rect x="18" y="20" width="130" height="52" rx="8" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="1.8" />
+            <text x="83" y="42" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">AssistantAgent</text>
+            <text x="83" y="58" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">負責 Thought 與動作決策</text>
+
+            <rect x="282" y="20" width="130" height="52" rx="8" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="1.8" />
+            <text x="347" y="42" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">Executor (UserProxy)</text>
+            <text x="347" y="58" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">執行環境動作與回傳結果</text>
+
+            <rect x="135" y="104" width="160" height="48" rx="8" fill="var(--surface-container-high)" stroke="var(--positive)" stroke-width="1.8" />
+            <text x="215" y="125" text-anchor="middle" fill="var(--positive)" font-size="11.5" font-weight="700">GroundingAgent 校準者</text>
+            <text x="215" y="141" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">偵測死循環 · 注入常識提示</text>
+
+            <line x1="148" y1="38" x2="278" y2="38" stroke="var(--tertiary)" stroke-width="1.6" marker-end="url(#arr-m1)" />
+            <line x1="278" y1="54" x2="152" y2="54" stroke="var(--tertiary)" stroke-width="1.6" marker-end="url(#arr-m1)" />
+            <line x1="215" y1="104" x2="215" y2="60" stroke="var(--positive)" stroke-width="1.5" stroke-dasharray="3 2" />
+          </svg>
+        `
+      },
+      swarm: {
+        caption: `OpenAI Swarm 輕量級協作：定義 Routines（指令與工具）與 Handoffs（對話交接）。分診代理可依客戶意圖，將對話無縫交接給「銷售代理」或「退款專責代理」。`,
+        svg: `
+          <svg viewBox="0 0 430 165" style="width:100%;max-height:160px;" aria-hidden="true">
+            <defs>
+              <marker id="arr-m2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--primary)" />
+              </marker>
+            </defs>
+            <rect x="18" y="56" width="115" height="54" rx="8" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="1.8" />
+            <text x="75" y="79" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">Triage 分診代理</text>
+            <text x="75" y="96" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">識別用戶意圖</text>
+
+            <rect x="270" y="16" width="140" height="52" rx="8" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="1.8" />
+            <text x="340" y="38" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">Sales 銷售代理</text>
+            <text x="340" y="54" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">處理報價與產品諮詢</text>
+
+            <rect x="270" y="96" width="140" height="52" rx="8" fill="var(--surface-container-high)" stroke="var(--violet-accent)" stroke-width="1.8" />
+            <text x="340" y="118" text-anchor="middle" fill="var(--on-surface)" font-size="11.5" font-weight="700">Refunds 退款代理</text>
+            <text x="340" y="134" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9.5">執行退貨與帳務工具</text>
+
+            <line x1="133" y1="72" x2="266" y2="44" stroke="var(--primary)" stroke-width="1.8" marker-end="url(#arr-m2)" />
+            <line x1="133" y1="94" x2="266" y2="122" stroke="var(--primary)" stroke-width="1.8" marker-end="url(#arr-m2)" />
+            <text x="200" y="45" text-anchor="middle" fill="var(--tertiary)" font-size="9.5" font-family="JetBrains Mono">Handoff →</text>
+            <text x="200" y="124" text-anchor="middle" fill="var(--violet-accent)" font-size="9.5" font-family="JetBrains Mono">Handoff →</text>
+          </svg>
+        `
+      },
+      magentic: {
+        caption: `Microsoft Magentic-One 中心調度：由核心 Orchestrator 負責高階規劃、進度追蹤與錯誤復原，動態指派任務給瀏覽器、本地檔案與 Python 執行代理。`,
+        svg: `
+          <svg viewBox="0 0 430 165" style="width:100%;max-height:160px;" aria-hidden="true">
+            <defs>
+              <marker id="arr-m3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+                <path d="M 0 1 L 10 5 L 0 9 z" fill="var(--tertiary)" />
+              </marker>
+            </defs>
+            <rect x="135" y="12" width="160" height="50" rx="8" fill="var(--primary-container)" stroke="var(--primary)" stroke-width="1.8" />
+            <text x="215" y="34" text-anchor="middle" fill="var(--on-surface)" font-size="12" font-weight="700">Orchestrator 總管代理</text>
+            <text x="215" y="50" text-anchor="middle" fill="var(--tertiary)" font-size="9.5">規劃 · 追蹤 · 動態重排</text>
+
+            <rect x="16" y="102" width="118" height="48" rx="7" fill="var(--surface-container-high)" stroke="var(--tertiary)" stroke-width="1.5" />
+            <text x="75" y="124" text-anchor="middle" fill="var(--on-surface)" font-size="11" font-weight="600">WebSurfer</text>
+            <text x="75" y="139" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">操作網頁瀏覽器</text>
+
+            <rect x="156" y="102" width="118" height="48" rx="7" fill="var(--surface-container-high)" stroke="var(--positive)" stroke-width="1.5" />
+            <text x="215" y="124" text-anchor="middle" fill="var(--on-surface)" font-size="11" font-weight="600">FileSurfer</text>
+            <text x="215" y="139" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">瀏覽本地端檔案</text>
+
+            <rect x="296" y="102" width="118" height="48" rx="7" fill="var(--surface-container-high)" stroke="var(--violet-accent)" stroke-width="1.5" />
+            <text x="355" y="124" text-anchor="middle" fill="var(--on-surface)" font-size="11" font-weight="600">Coder / Terminal</text>
+            <text x="355" y="139" text-anchor="middle" fill="var(--on-surface-variant)" font-size="9">撰寫並執行 Python</text>
+
+            <line x1="165" y1="62" x2="88" y2="99" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-m3)" />
+            <line x1="215" y1="62" x2="215" y2="99" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-m3)" />
+            <line x1="265" y1="62" x2="342" y2="99" stroke="var(--tertiary)" stroke-width="1.5" marker-end="url(#arr-m3)" />
+          </svg>
+        `
+      }
+    };
+
+    const QUIZ_QUESTIONS = [
+      {
+        id: `q1`,
+        question: `Q1. 在 ReAct 閉環架構（Â = A ∪ L）中，加入自然語言「Thought 思考」相較於純行動（Act-only）或純思維鏈（CoT）的核心優勢為何？`,
+        options: [
+          `Thought 可完全取代外部工具，讓模型只憑參數記憶完成所有任務`,
+          `Thought 不直接改變環境，但能更新上下文 c_t 以進行目標拆解與例外修正，同時透過 Action 接地外部事證減少幻覺`,
+          `Thought 會強制模型每次都輸出完全相同的回應以確保系統穩定`
+        ],
+        answerIndex: 1,
+        explanation: `正確！依據 Yao et al. (2023) ReAct 論文，Thought（語言空間 L）能追蹤進度與調整計畫，而 Action 則從外部環境取得 Observation 事證，兩者協同可避免 CoT 的靜態幻覺與 Act-only 的目標迷失。`
+      },
+      {
+        id: `q2`,
+        question: `Q2. 在 Generative Agents（Smallville）的三維記憶檢索架構中，系統是依據哪三個指標來評分並提取 Memory Stream 中的關鍵記憶？`,
+        options: [
+          `參數量（Parameters）、訓練輪數（Epochs）、詞彙量（Vocabulary）`,
+          `時近性（Recency）、重要性（Importance）、相關性（Relevance）`,
+          `越獄率（Jailbreak）、延遲度（Latency）、吞吐量（Throughput）`
+        ],
+        answerIndex: 1,
+        explanation: `正確！依據 Park et al. (2023)，Generative Agents 結合時近性（近期事件權重高）、重要性（由 LLM 區分日常與核心事件）與相關性（與當前查詢的語意相似度）三大維度檢索記憶流。`
+      },
+      {
+        id: `q3`,
+        question: `Q3. 下列關於 LLM Agent 評測與安全防禦機制的敘述，何者正確？`,
+        options: [
+          `AirGapAgent 透過上下文隔離與資料最小化保護隱私，能達成約 97% 隱私防護同時維持 88%–90% 效用`,
+          `AgentBench 顯示超過任務輪數上限（TLE）的主因是模型從不重複任何輸出`,
+          `ToolEmu 必須在真實生產環境直接執行破壞性工具才能評估風險`
+        ],
+        answerIndex: 0,
+        explanation: `正確！依據 ACM 3773080 安全綜述，AirGapAgent 利用上下文隔離達成 97% 隱私保護並保有高任務效用；而 AgentBench 的 TLE 主因恰為模型陷入內容重複，ToolEmu 則以 LM 模擬工具執行來降低測試風險與建置時間。`
+      }
+    ];
+
+    let appState = {
+      currentSlide: 1,
+      selectedPillar: `profile`,
+      reactCase: `fever`,
+      reactStep: 1,
+      masTopology: `autogen`,
+      memoryWeights: { recency: 1.0, importance: 1.0, relevance: 1.0 },
+      quizAnswers: {}
+    };
+
+    function persistState() {
+      if (window.notebookAppApi && typeof window.notebookAppApi.setAppState === `function`) {
+        window.notebookAppApi.setAppState(appState).catch(function() {});
+      }
+    }
+
+    function buildNavigationChrome() {
+      const toc = document.getElementById(`toc-popover`);
+      const dots = document.getElementById(`nav-dots`);
+      if (toc) {
+        toc.innerHTML = SLIDE_TITLES.map(function(title, idx) {
+          const num = idx + 1;
+          const padded = num < 10 ? `0` + num : `` + num;
+          return `<button type="button" class="toc-item" data-toc-slide="` + num + `" onclick="jumpFromToc(` + num + `)" role="menuitem">
+            <span class="toc-num">` + padded + `</span>
+            <span>` + title + `</span>
+          </button>`;
+        }).join(``);
+      }
+      if (dots) {
+        dots.innerHTML = SLIDE_TITLES.map(function(title, idx) {
+          const num = idx + 1;
+          return `<button type="button" class="nav-dot" data-dot-slide="` + num + `" onclick="goToSlide(` + num + `)" aria-label="前往第 ` + num + ` 頁：` + title + `" title="` + num + `. ` + title + `"></button>`;
+        }).join(``);
+      }
+    }
+
+    function renderSlideVisibility() {
+      const slides = document.querySelectorAll(`.slide`);
+      slides.forEach(function(slide) {
+        const sNum = Number(slide.getAttribute(`data-slide`));
+        if (sNum === appState.currentSlide) {
+          slide.classList.add(`active`);
+          slide.scrollTop = 0;
+        } else {
+          slide.classList.remove(`active`);
+        }
+      });
+
+      const counter = document.getElementById(`page-counter`);
+      if (counter) {
+        counter.textContent = appState.currentSlide + ` / ` + TOTAL_SLIDES;
+      }
+
+      const fill = document.getElementById(`progress-fill`);
+      if (fill) {
+        fill.style.width = ((appState.currentSlide / TOTAL_SLIDES) * 100).toFixed(2) + `%`;
+      }
+
+      const prevBtn = document.getElementById(`btn-prev`);
+      if (prevBtn) {
+        prevBtn.disabled = appState.currentSlide <= 1;
+      }
+      const nextBtn = document.getElementById(`btn-next`);
+      if (nextBtn) {
+        nextBtn.disabled = appState.currentSlide >= TOTAL_SLIDES;
+      }
+
+      document.querySelectorAll(`.nav-dot`).forEach(function(dot) {
+        const dNum = Number(dot.getAttribute(`data-dot-slide`));
+        dot.classList.toggle(`active`, dNum === appState.currentSlide);
+      });
+
+      document.querySelectorAll(`.toc-item`).forEach(function(item) {
+        const tNum = Number(item.getAttribute(`data-toc-slide`));
+        item.classList.toggle(`active`, tNum === appState.currentSlide);
+      });
+    }
+
+    function goToSlide(num) {
+      const target = Math.max(1, Math.min(TOTAL_SLIDES, Number(num) || 1));
+      appState.currentSlide = target;
+      renderSlideVisibility();
+      persistState();
+    }
+
+    function prevSlide() {
+      if (appState.currentSlide > 1) {
+        goToSlide(appState.currentSlide - 1);
+      }
+    }
+
+    function nextSlide() {
+      if (appState.currentSlide < TOTAL_SLIDES) {
+        goToSlide(appState.currentSlide + 1);
+      }
+    }
+
+    function toggleToc() {
+      const pop = document.getElementById(`toc-popover`);
+      const btn = document.getElementById(`toc-toggle`);
+      if (!pop || !btn) return;
+      const isOpen = pop.classList.toggle(`open`);
+      btn.setAttribute(`aria-expanded`, isOpen ? `true` : `false`);
+    }
+
+    function jumpFromToc(num) {
+      goToSlide(num);
+      const pop = document.getElementById(`toc-popover`);
+      const btn = document.getElementById(`toc-toggle`);
+      if (pop) pop.classList.remove(`open`);
+      if (btn) btn.setAttribute(`aria-expanded`, `false`);
+    }
+
+    function selectPillar(key) {
+      if (!PILLAR_DATA[key]) return;
+      appState.selectedPillar = key;
+      renderPillarDetail();
+      persistState();
+    }
+
+    function renderPillarDetail() {
+      const data = PILLAR_DATA[appState.selectedPillar] || PILLAR_DATA.profile;
+      const keys = [`profile`, `memory`, `planning`, `action`];
+      keys.forEach(function(k) {
+        const btn = document.getElementById(`pillar-btn-` + k);
+        if (btn) btn.classList.toggle(`active`, k === appState.selectedPillar);
+      });
+
+      const tagEl = document.getElementById(`pillar-detail-tag`);
+      const titleEl = document.getElementById(`pillar-detail-title`);
+      const descEl = document.getElementById(`pillar-detail-desc`);
+      const gridEl = document.getElementById(`pillar-detail-grid`);
+
+      if (tagEl) tagEl.textContent = data.tag;
+      if (titleEl) titleEl.textContent = data.title;
+      if (descEl) descEl.textContent = data.desc;
+      if (gridEl) {
+        gridEl.innerHTML = data.items.map(function(item) {
+          return `<div class="panel-well">
+            <div style="font-weight:600;font-size:0.84rem;color:var(--tertiary);margin-bottom:3px;">` + item.label + `</div>
+            <div style="font-size:0.8rem;color:var(--on-surface-variant);line-height:1.5;">` + item.text + `</div>
+          </div>`;
+        }).join(``);
+      }
+    }
+
+    function selectReactCase(caseKey) {
+      if (!REACT_CASES[caseKey]) return;
+      appState.reactCase = caseKey;
+      appState.reactStep = 1;
+      renderReactTrace();
+      persistState();
+    }
+
+    function nextReactStep() {
+      const data = REACT_CASES[appState.reactCase] || REACT_CASES.fever;
+      appState.reactStep = appState.reactStep >= data.steps.length ? 1 : appState.reactStep + 1;
+      renderReactTrace();
+      persistState();
+    }
+
+    function renderReactTrace() {
+      const data = REACT_CASES[appState.reactCase] || REACT_CASES.fever;
+      const feverBtn = document.getElementById(`react-case-fever`);
+      const hotpotBtn = document.getElementById(`react-case-hotpot`);
+      if (feverBtn) feverBtn.classList.toggle(`active`, appState.reactCase === `fever`);
+      if (hotpotBtn) hotpotBtn.classList.toggle(`active`, appState.reactCase === `hotpot`);
+
+      const claimEl = document.getElementById(`react-claim-text`);
+      const noteEl = document.getElementById(`react-compare-note`);
+      const badgeEl = document.getElementById(`react-step-badge`);
+      const listEl = document.getElementById(`react-trace-list`);
+
+      if (claimEl) claimEl.textContent = data.claim;
+      if (noteEl) noteEl.textContent = data.note;
+      if (badgeEl) badgeEl.textContent = `步驟 ` + appState.reactStep + ` / ` + data.steps.length;
+
+      if (listEl) {
+        listEl.innerHTML = data.steps.map(function(step, idx) {
+          const isVisible = idx < appState.reactStep;
+          const isCurrent = idx === appState.reactStep - 1;
+          const opacityStyle = isVisible ? `opacity:1;` : `opacity:0.3;`;
+          const borderStyle = isCurrent ? `border-color:` + step.color + `;` : ``;
+          return `<div class="panel-well" style="padding:7px 10px;` + opacityStyle + borderStyle + `">
+            <div style="font-family:var(--font-label);font-size:0.74rem;font-weight:600;color:` + step.color + `;">` + step.type + `</div>
+            <div style="font-size:0.8rem;color:var(--on-surface);">` + step.text + `</div>
+          </div>`;
+        }).join(``);
+      }
+    }
+
+    function updateMemoryRanking() {
+      const rEl = document.getElementById(`w-recency`);
+      const iEl = document.getElementById(`w-importance`);
+      const lEl = document.getElementById(`w-relevance`);
+      if (rEl && iEl && lEl) {
+        appState.memoryWeights = {
+          recency: Number(rEl.value),
+          importance: Number(iEl.value),
+          relevance: Number(lEl.value)
+        };
+      }
+      renderMemoryRanking();
+      persistState();
+    }
+
+    function resetMemoryWeights() {
+      appState.memoryWeights = { recency: 1.0, importance: 1.0, relevance: 1.0 };
+      const rEl = document.getElementById(`w-recency`);
+      const iEl = document.getElementById(`w-importance`);
+      const lEl = document.getElementById(`w-relevance`);
+      if (rEl) rEl.value = `1.0`;
+      if (iEl) iEl.value = `1.0`;
+      if (lEl) lEl.value = `1.0`;
+      renderMemoryRanking();
+      persistState();
+    }
+
+    function renderMemoryRanking() {
+      const w = appState.memoryWeights;
+      const vr = document.getElementById(`val-recency`);
+      const vi = document.getElementById(`val-importance`);
+      const vl = document.getElementById(`val-relevance`);
+      if (vr) vr.textContent = w.recency.toFixed(1);
+      if (vi) vi.textContent = w.importance.toFixed(1);
+      if (vl) vl.textContent = w.relevance.toFixed(1);
+
+      const rEl = document.getElementById(`w-recency`);
+      const iEl = document.getElementById(`w-importance`);
+      const lEl = document.getElementById(`w-relevance`);
+      if (rEl) rEl.value = w.recency;
+      if (iEl) iEl.value = w.importance;
+      if (lEl) lEl.value = w.relevance;
+
+      const scored = MEMORY_ITEMS.map(function(m) {
+        const total = m.recency * w.recency + m.importance * w.importance + m.relevance * w.relevance;
+        return {
+          id: m.id,
+          text: m.text,
+          recency: m.recency,
+          importance: m.importance,
+          relevance: m.relevance,
+          tag: m.tag,
+          score: total
+        };
+      }).sort(function(a, b) {
+        return b.score - a.score;
+      });
+
+      const listEl = document.getElementById(`memory-ranked-list`);
+      if (listEl) {
+        listEl.innerHTML = scored.map(function(m, idx) {
+          const topClass = idx === 0 ? ` top-hit` : ``;
+          const rankLabel = idx === 0 ? `TOP 1 提取` : `排序 #` + (idx + 1);
+          return `<div class="memory-item` + topClass + `">
+            <div>
+              <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;flex-wrap:wrap;">
+                <span class="badge ` + (idx === 0 ? `is-positive` : `is-indigo`) + `">` + rankLabel + `</span>
+                <span style="font-family:var(--font-label);font-size:0.72rem;color:var(--on-surface-variant);">` + m.tag + ` · 時近 ` + m.recency + ` / 重要 ` + m.importance + ` / 相關 ` + m.relevance + `</span>
+              </div>
+              <div style="font-size:0.8rem;color:var(--on-surface);line-height:1.45;">` + m.text + `</div>
+            </div>
+            <div class="score-pill">` + m.score.toFixed(2) + `</div>
+          </div>`;
+        }).join(``);
+      }
+    }
+
+    function selectMasTopology(key) {
+      if (!MAS_TOPOLOGIES[key]) return;
+      appState.masTopology = key;
+      renderMasTopology();
+      persistState();
+    }
+
+    function renderMasTopology() {
+      const data = MAS_TOPOLOGIES[appState.masTopology] || MAS_TOPOLOGIES.autogen;
+      [`autogen`, `swarm`, `magentic`].forEach(function(k) {
+        const btn = document.getElementById(`mas-tab-` + k);
+        if (btn) btn.classList.toggle(`active`, k === appState.masTopology);
+      });
+      const svgEl = document.getElementById(`mas-svg-container`);
+      const capEl = document.getElementById(`mas-caption`);
+      if (svgEl) svgEl.innerHTML = data.svg;
+      if (capEl) capEl.textContent = data.caption;
+    }
+
+    function answerQuiz(qId, optIndex) {
+      if (appState.quizAnswers[qId] !== undefined) return;
+      appState.quizAnswers[qId] = optIndex;
+      renderQuiz();
+      persistState();
+    }
+
+    function resetQuiz() {
+      appState.quizAnswers = {};
+      renderQuiz();
+      persistState();
+    }
+
+    function renderQuiz() {
+      const container = document.getElementById(`quiz-container`);
+      const scoreBadge = document.getElementById(`quiz-score-badge`);
+      if (!container) return;
+
+      let answeredCount = 0;
+      let correctCount = 0;
+
+      container.innerHTML = QUIZ_QUESTIONS.map(function(q) {
+        const chosen = appState.quizAnswers[q.id];
+        const hasAnswered = chosen !== undefined;
+        if (hasAnswered) {
+          answeredCount += 1;
+          if (chosen === q.answerIndex) correctCount += 1;
+        }
+        const isCorrect = chosen === q.answerIndex;
+
+        const optionsHtml = q.options.map(function(optText, idx) {
+          let cls = `quiz-opt`;
+          let prefix = String.fromCharCode(65 + idx) + `.`;
+          if (hasAnswered) {
+            if (idx === q.answerIndex) {
+              cls += ` is-correct`;
+              prefix = `✓`;
+            } else if (idx === chosen) {
+              cls += ` is-wrong`;
+              prefix = `✕`;
+            } else {
+              cls += ` is-dimmed`;
+            }
+          }
+          const disabledAttr = hasAnswered ? ` disabled` : ``;
+          return `<button type="button" class="` + cls + `" onclick="answerQuiz('` + q.id + `', ` + idx + `)"` + disabledAttr + `>
+            <strong style="font-family:var(--font-label);min-width:18px;">` + prefix + `</strong>
+            <span>` + optText + `</span>
+          </button>`;
+        }).join(``);
+
+        const feedbackClass = hasAnswered ? (`quiz-feedback show ` + (isCorrect ? `correct` : `wrong`)) : `quiz-feedback`;
+        const feedbackTitle = isCorrect ? `答對了！` : `答錯了（正確答案為 ` + String.fromCharCode(65 + q.answerIndex) + `）`;
+
+        return `<div class="quiz-card">
+          <p class="quiz-q">` + q.question + `</p>
+          <div class="quiz-options">` + optionsHtml + `</div>
+          <div class="` + feedbackClass + `">
+            <strong>` + feedbackTitle + `</strong>
+            <div style="margin-top:3px;color:var(--on-surface-variant);">` + q.explanation + `</div>
+          </div>
+        </div>`;
+      }).join(``);
+
+      if (scoreBadge) {
+        scoreBadge.textContent = `已作答 ` + answeredCount + ` / 3 題 · 得分 ` + correctCount + ` / 3`;
+      }
+    }
+
+    function handleKeyNavigation(e) {
+      if (e.target && (e.target.tagName === `INPUT` || e.target.tagName === `TEXTAREA` || e.target.tagName === `SELECT`)) {
+        return;
+      }
+      if (e.key === `ArrowRight` || e.key === `PageDown`) {
+        e.preventDefault();
+        nextSlide();
+      } else if (e.key === `ArrowLeft` || e.key === `PageUp`) {
+        e.preventDefault();
+        prevSlide();
+      } else if (e.key === `Escape`) {
+        const pop = document.getElementById(`toc-popover`);
+        const btn = document.getElementById(`toc-toggle`);
+        if (pop) pop.classList.remove(`open`);
+        if (btn) btn.setAttribute(`aria-expanded`, `false`);
+      }
+    }
+
+    async function initPresentation() {
+      buildNavigationChrome();
+
+      if (window.notebookAppApi && typeof window.notebookAppApi.getAppState === `function`) {
+        try {
+          const saved = await window.notebookAppApi.getAppState();
+          if (saved && typeof saved === `object`) {
+            if (saved.currentSlide >= 1 && saved.currentSlide <= TOTAL_SLIDES) {
+              appState.currentSlide = saved.currentSlide;
+            }
+            if (saved.selectedPillar && PILLAR_DATA[saved.selectedPillar]) {
+              appState.selectedPillar = saved.selectedPillar;
+            }
+            if (saved.reactCase && REACT_CASES[saved.reactCase]) {
+              appState.reactCase = saved.reactCase;
+            }
+            if (typeof saved.reactStep === `number`) {
+              appState.reactStep = saved.reactStep;
+            }
+            if (saved.masTopology && MAS_TOPOLOGIES[saved.masTopology]) {
+              appState.masTopology = saved.masTopology;
+            }
+            if (saved.memoryWeights && typeof saved.memoryWeights === `object`) {
+              appState.memoryWeights = saved.memoryWeights;
+            }
+            if (saved.quizAnswers && typeof saved.quizAnswers === `object`) {
+              appState.quizAnswers = saved.quizAnswers;
+            }
+          }
+        } catch (err) {
+          // Ignore state load errors and continue with defaults
+        }
+      }
+
+      renderSlideVisibility();
+      renderPillarDetail();
+      renderReactTrace();
+      renderMemoryRanking();
+      renderMasTopology();
+      renderQuiz();
+
+      document.addEventListener(`keydown`, handleKeyNavigation);
+      document.addEventListener(`click`, function(e) {
+        const pop = document.getElementById(`toc-popover`);
+        const btn = document.getElementById(`toc-toggle`);
+        if (!pop || !btn) return;
+        if (pop.classList.contains(`open`) && !pop.contains(e.target) && !btn.contains(e.target)) {
+          pop.classList.remove(`open`);
+          btn.setAttribute(`aria-expanded`, `false`);
+        }
+      });
+
+      if (window.lucide && typeof window.lucide.createIcons === `function`) {
+        window.lucide.createIcons();
+      }
+
+      if (window.notebookAppApi && typeof window.notebookAppApi.notifyAppReady === `function`) {
+        window.notebookAppApi.notifyAppReady();
+      }
+    }
+
+    initPresentation();
+  </script>
+</body>
+</html>
